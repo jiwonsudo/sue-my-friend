@@ -144,22 +144,33 @@ export function TrialClient({
           {view.caseNo} <span className="text-white/25">|</span> {view.title}
         </p>
 
-        {/* 무대 */}
-        <div className="mt-3 grid grid-cols-3 items-end gap-2 text-center">
-          <Figure label="원고" name={view.plaintiffNick} active={speaker === "plaintiff"} me={me === "plaintiff"}>
-            <PlaintiffAvatar size={76} />
-          </Figure>
-          <Figure label="재판장" name="" active={speaker === "judge"} raised>
-            <JudgeAvatar size={84} />
-          </Figure>
-          <Figure label="피고" name={view.defendantNick} active={speaker === "defendant"} me={me === "defendant"} flip>
-            <DefendantAvatar size={76} />
-          </Figure>
+        {/* 법정: 높은 법대 위 재판장, 아래 양쪽 진술대 */}
+        <div className="relative mt-3">
+          {/* 재판장석 */}
+          <div className="relative mx-auto flex w-[72%] flex-col items-center">
+            <Spot on={speaker === "judge"} />
+            <div className="court-chair absolute top-0 h-[104px] w-[92px] rounded-t-[46px]" />
+            <motion.div className="relative z-10 pt-4" animate={{ scale: speaker === "judge" ? 1.05 : 1 }}>
+              <JudgeAvatar size={84} className="text-[#0b0b0d] drop-shadow-[0_0_1px_rgb(255_230_190/0.5)]" />
+            </motion.div>
+            <div className="court-bench relative z-20 -mt-6 flex h-12 w-full items-center justify-center">
+              <Plate>재판장</Plate>
+            </div>
+          </div>
+          {/* 진술대 */}
+          <div className="-mt-1 grid grid-cols-2 gap-12 px-1">
+            <Stand label="원고" name={view.plaintiffNick} active={speaker === "plaintiff"} me={me === "plaintiff"}>
+              <PlaintiffAvatar size={86} />
+            </Stand>
+            <Stand label="피고" name={view.defendantNick} active={speaker === "defendant"} me={me === "defendant"} flip>
+              <DefendantAvatar size={86} />
+            </Stand>
+          </div>
         </div>
 
         {/* 대사창 */}
-        <div className="mt-4 min-h-28 border-2 border-white/80 bg-black/70 p-4 shadow-[0_0_0_4px_rgba(0,0,0,0.6)]">
-          <p className="mb-1 font-type text-[12px] font-bold text-seal">
+        <div className="court-dialog mt-4 min-h-28 p-4">
+          <p className="mb-1 font-type text-[12px] font-bold text-brass">
             {speaker === "judge" ? "재판장" : `${ROLE_LABEL[speaker]} ${nick(speaker)}`}
           </p>
           <p className="text-[16px] leading-relaxed">
@@ -254,12 +265,34 @@ export function TrialClient({
   );
 }
 
-function Figure({
+/** 화자에게 떨어지는 조명 */
+function Spot({ on }: { on: boolean }) {
+  return (
+    <motion.div
+      aria-hidden
+      className="pointer-events-none absolute -inset-x-6 -top-6 bottom-0 bg-[radial-gradient(ellipse_at_50%_35%,rgb(255_214_150/0.35),transparent_65%)]"
+      initial={false}
+      animate={{ opacity: on ? 1 : 0 }}
+      transition={{ duration: 0.4 }}
+    />
+  );
+}
+
+/** 놋쇠 명패 */
+function Plate({ children }: { children: React.ReactNode }) {
+  return (
+    <span className="brass-plate inline-block px-2.5 py-0.5 font-serif text-[11.5px] font-bold tracking-[0.2em] whitespace-nowrap text-[#2a1a0c]">
+      {children}
+    </span>
+  );
+}
+
+/** 원고·피고 진술대 */
+function Stand({
   label,
   name,
   active,
   me,
-  raised,
   flip,
   children,
 }: {
@@ -267,19 +300,25 @@ function Figure({
   name: string;
   active: boolean;
   me?: boolean;
-  raised?: boolean;
   flip?: boolean;
   children: React.ReactNode;
 }) {
   return (
-    <motion.div animate={{ scale: active ? 1.06 : 1, opacity: active ? 1 : 0.55 }} className={raised ? "-translate-y-3" : ""}>
-      <div className={`mx-auto w-fit ${active ? "text-white" : "text-white/70"} ${flip ? "-scale-x-100" : ""}`}>{children}</div>
-      <div className={`mx-auto mt-1 w-fit px-2 py-0.5 font-type text-[11px] font-bold ${raised ? "bg-seal" : "border border-white/20"}`}>
-        {label}
-        {name && ` ${name}`}
-        {me && <span className="ml-1 text-white/50">(나)</span>}
+    <div className="relative flex flex-col items-center">
+      <Spot on={active} />
+      <motion.div
+        className={`relative z-10 ${flip ? "-scale-x-100" : ""} ${active ? "text-[#f1e4cc]" : "text-[#b9a68a]"}`}
+        animate={{ y: active ? -3 : 0, opacity: active ? 1 : 0.75 }}
+      >
+        {children}
+      </motion.div>
+      <div className="court-stand relative z-20 -mt-7 flex h-11 w-full items-center justify-center px-1">
+        <Plate>
+          {label} {name}
+          {me && <span className="ml-1 font-type text-[10px] tracking-normal text-[#5a3a14]">(나)</span>}
+        </Plate>
       </div>
-    </motion.div>
+    </div>
   );
 }
 

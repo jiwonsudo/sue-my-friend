@@ -121,7 +121,7 @@ export function DefendantView({ token, caseId, firstOpen, status, responded, dea
 
   if (phase === "intro") {
     return (
-      <div className="min-h-dvh bg-[#e7e1d5]">
+      <div className="min-h-dvh bg-[#e9e1d1]">
         <div className="flex h-12 items-center justify-between px-4">
           <BrandLabel />
           <button type="button" className="min-h-11 px-2 font-type text-[13px] text-black/50" onClick={finishIntro}>

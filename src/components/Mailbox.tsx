@@ -2,6 +2,7 @@
 
 import { AnimatePresence, motion, type PanInfo } from "framer-motion";
 import { useState } from "react";
+import { TriFold } from "./desk/TriFold";
 import { RubberStamp } from "./Seal";
 
 type Stage = "closed" | "envelope" | "tearing" | "unfold";
@@ -24,7 +25,7 @@ export function MailboxSequence({ fromNick, onDone }: { fromNick: string; onDone
   };
 
   return (
-    <div className="relative flex h-[calc(100dvh-48px)] items-center justify-center overflow-hidden [perspective:1200px]">
+    <div className="mailbox-scene relative flex h-[calc(100dvh-48px)] items-center justify-center overflow-hidden [perspective:1200px]">
       {/* 우편함 */}
       <AnimatePresence>
         {(stage === "closed" || stage === "envelope") && (
@@ -32,9 +33,9 @@ export function MailboxSequence({ fromNick, onDone }: { fromNick: string; onDone
             type="button"
             aria-label="우편함 열기"
             onClick={openBox}
-            className="absolute"
+            className="absolute bottom-[12%]"
             initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: stage === "envelope" ? 80 : 0, scale: stage === "envelope" ? 0.85 : 1 }}
+            animate={{ opacity: 1, y: stage === "envelope" ? 60 : 0, scale: stage === "envelope" ? 0.9 : 1 }}
             exit={{ opacity: 0, y: 140 }}
             transition={{ type: "spring", stiffness: 160, damping: 20 }}
           >
@@ -72,7 +73,7 @@ export function MailboxSequence({ fromNick, onDone }: { fromNick: string; onDone
             animate={stage === "tearing" ? { y: -70, opacity: 1 } : { y: 0, opacity: 1 }}
             transition={{ delay: stage === "tearing" ? 0.35 : 0, duration: 0.55, ease: "easeOut" }}
           >
-            <FoldedPaper unfolding={stage === "unfold"} />
+            <TriFold folded={stage !== "unfold"} initialFolded />
           </motion.div>
         )}
       </AnimatePresence>
@@ -85,42 +86,93 @@ export function MailboxSequence({ fromNick, onDone }: { fromNick: string; onDone
   );
 }
 
+/** 비스듬히 본 원통형 우편함. 평면 SVG 지만 그라데이션·그림자로 입체감을 낸다. */
 function MailboxArt({ open }: { open: boolean }) {
+  // 앞면 아치: 중심 (85, 110), 반지름 45, 아래 175 / 뒷면은 (+75, -27) 만큼 뒤로
+  const front = "M40 175 V110 A45 45 0 0 1 130 110 V175 Z";
   return (
-    <svg width="220" height="240" viewBox="0 0 220 240" aria-hidden>
-      {/* 기둥 */}
-      <rect x="98" y="150" width="24" height="90" fill="#3b3b3b" />
-      {/* 몸통 */}
-      <path d="M20 150 V80 a70 60 0 0 1 140 0 V150 Z" fill="#2b2f36" />
-      <path d="M20 150 V80 a70 60 0 0 1 140 0 V150 Z" fill="url(#shine)" opacity="0.25" />
+    <svg width="290" height="348" viewBox="0 0 250 300" aria-hidden className="overflow-visible">
       <defs>
-        <linearGradient id="shine" x1="0" x2="1">
-          <stop offset="0" stopColor="#fff" stopOpacity="0" />
-          <stop offset="0.4" stopColor="#fff" stopOpacity="0.5" />
-          <stop offset="1" stopColor="#fff" stopOpacity="0" />
+        <linearGradient id="mb-body" x1="0.25" y1="0" x2="0.65" y2="1">
+          <stop offset="0" stopColor="#8d99a8" />
+          <stop offset="0.18" stopColor="#5b6674" />
+          <stop offset="0.55" stopColor="#343b45" />
+          <stop offset="1" stopColor="#171a1f" />
         </linearGradient>
+        <linearGradient id="mb-front" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stopColor="#4a535f" />
+          <stop offset="1" stopColor="#252a31" />
+        </linearGradient>
+        <linearGradient id="mb-inside" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#020203" />
+          <stop offset="1" stopColor="#24282e" />
+        </linearGradient>
+        <linearGradient id="mb-post" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0" stopColor="#9a6b42" />
+          <stop offset="0.6" stopColor="#7a5030" />
+          <stop offset="1" stopColor="#56371f" />
+        </linearGradient>
+        <linearGradient id="mb-flag" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#e3384a" />
+          <stop offset="1" stopColor="#97101d" />
+        </linearGradient>
+        <radialGradient id="mb-shadow">
+          <stop offset="0" stopColor="#000" stopOpacity="0.45" />
+          <stop offset="1" stopColor="#000" stopOpacity="0" />
+        </radialGradient>
       </defs>
-      {/* 안쪽 (문 열렸을 때 보임) */}
-      <path d="M150 150 V82 a10 10 0 0 1 10 -2 V150 Z" fill="#111" />
-      <rect x="148" y="78" width="14" height="72" fill="#0d0d0d" />
-      {/* 문 */}
+
+      {/* 바닥 그림자 */}
+      <ellipse cx="150" cy="290" rx="95" ry="12" fill="url(#mb-shadow)" />
+
+      {/* 기둥: 앞면 + 옆면 */}
+      <path d="M150 168 l10 -4 v124 l-10 4 z" fill="#4a2f1a" />
+      <rect x="118" y="168" width="32" height="124" fill="url(#mb-post)" />
+      <path d="M124 180 v100 M134 175 v110 M143 185 v95" stroke="#000" strokeOpacity="0.12" strokeWidth="1" />
+      {/* 받침대 */}
+      <path d="M96 160 h80 l12 -6 v8 l-12 6 h-80 z" fill="#6b4529" />
+      <path d="M96 160 h80 l12 -6 h-80 z" fill="#a77a4f" />
+
+      {/* 몸통 옆면 (원통) */}
+      <path d="M85 65 L160 38 A45 45 0 0 1 205 83 V148 L130 175 V110 A45 45 0 0 0 85 65 Z" fill="url(#mb-body)" />
+      {/* 위쪽 하이라이트, 리벳 줄 */}
+      <path d="M72 72 L148 45" stroke="#fff" strokeOpacity="0.35" strokeWidth="5" strokeLinecap="round" />
+      <path d="M118 62 L192 36" stroke="#fff" strokeOpacity="0.12" strokeWidth="10" strokeLinecap="round" />
+      <path d="M140 110 Q170 98 198 90 M140 160 L198 139" stroke="#000" strokeOpacity="0.25" strokeWidth="1.2" fill="none" />
+
+      {/* 열렸을 때 안쪽 */}
+      <path d={front} fill="url(#mb-inside)" />
+      {open && (
+        <g>
+          <path d="M58 168 L66 128 L118 136 L112 172 Z" fill="#efe6d2" />
+          <path d="M66 128 L92 150 L118 136" stroke="#c9bfa8" fill="none" />
+        </g>
+      )}
+
+      {/* 문: 아래 경첩으로 앞으로 접혀 내려온다 */}
       <motion.g
-        style={{ originX: "160px", originY: "150px", transformBox: "view-box" }}
-        animate={{ scaleX: open ? -0.25 : 1, x: open ? 0 : 0 }}
-        transition={{ type: "spring", stiffness: 140, damping: 14 }}
+        style={{ originX: "85px", originY: "175px", transformBox: "view-box" }}
+        initial={false}
+        animate={{ scaleY: open ? -0.32 : 1, skewX: open ? -8 : 0 }}
+        transition={{ type: "spring", stiffness: 160, damping: 15 }}
       >
-        <path d="M148 150 V78 a14 14 0 0 1 26 0 V150 Z" fill="#c8102e" />
-        <rect x="156" y="108" width="10" height="4" rx="2" fill="#fff" opacity="0.8" />
+        <path d={front} fill="url(#mb-front)" stroke="#68717d" strokeWidth="3" />
+        <path d="M48 112 A37 37 0 0 1 85 75" stroke="#fff" strokeOpacity="0.25" strokeWidth="3" fill="none" strokeLinecap="round" />
+        <rect x="76" y="92" width="18" height="7" rx="3.5" fill="#c9cdd3" stroke="#2a2f36" />
       </motion.g>
-      {/* 깃발 (올라가 있음) */}
+
+      {/* 깃발 (올라감 = 우편물 있음) */}
+      <circle cx="176" cy="122" r="4" fill="#20242a" />
       <motion.g
         initial={{ rotate: 90 }}
         animate={{ rotate: 0 }}
-        transition={{ delay: 0.3, type: "spring", stiffness: 200, damping: 10 }}
-        style={{ originX: "30px", originY: "120px", transformBox: "view-box" }}
+        transition={{ delay: 0.35, type: "spring", stiffness: 200, damping: 10 }}
+        style={{ originX: "176px", originY: "122px", transformBox: "view-box" }}
       >
-        <rect x="26" y="40" width="8" height="82" fill="#d9d9d9" />
-        <path d="M30 40 h-26 v22 h26 Z" fill="#c8102e" />
+        <rect x="173" y="56" width="6" height="68" rx="2" fill="#c8ccd2" />
+        <rect x="176" y="56" width="3" height="68" fill="#8b9097" />
+        <path d="M179 56 h30 l-4 10 l4 10 h-30 z" fill="url(#mb-flag)" />
+        <path d="M179 76 h30" stroke="#5a0810" strokeWidth="2" />
       </motion.g>
     </svg>
   );
@@ -128,17 +180,18 @@ function MailboxArt({ open }: { open: boolean }) {
 
 function Envelope({ torn, fromNick }: { torn: boolean; fromNick: string }) {
   return (
-    <div className="relative h-[180px] w-[290px]">
-      {/* 뒷면 */}
-      <div className="absolute inset-0 rounded-md bg-[#efe6d2] shadow-xl" />
+    <div className="relative h-[180px] w-[290px] [transform:rotateX(14deg)_rotateZ(-3deg)]">
+      {/* 두께 + 그림자 */}
+      <div className="absolute inset-0 translate-y-[5px] rounded-[3px] bg-[#cdbf9f]" />
+      <div className="absolute inset-0 rounded-[3px] bg-[#efe6d2] shadow-[0_30px_40px_-12px_rgb(0_0_0/0.55),0_8px_12px_rgb(0_0_0/0.25)]" />
       {/* 뜯기는 윗부분 */}
       <motion.div
-        className="absolute inset-x-0 top-0 h-7 rounded-t-md bg-[#e9dfc8] [clip-path:polygon(0_0,100%_0,100%_70%,95%_100%,90%_70%,85%_100%,80%_70%,75%_100%,70%_70%,65%_100%,60%_70%,55%_100%,50%_70%,45%_100%,40%_70%,35%_100%,30%_70%,25%_100%,20%_70%,15%_100%,10%_70%,5%_100%,0_70%)]"
+        className="absolute inset-x-0 top-0 h-7 rounded-t-[3px] bg-[#e9dfc8] [clip-path:polygon(0_0,100%_0,100%_70%,95%_100%,90%_70%,85%_100%,80%_70%,75%_100%,70%_70%,65%_100%,60%_70%,55%_100%,50%_70%,45%_100%,40%_70%,35%_100%,30%_70%,25%_100%,20%_70%,15%_100%,10%_70%,5%_100%,0_70%)]"
         animate={torn ? { y: -60, x: 40, rotate: 18, opacity: 0 } : { y: 0 }}
         transition={{ duration: 0.45, ease: "easeIn" }}
       />
       {/* 앞면 */}
-      <div className="absolute inset-0 top-7 rounded-b-md border-t border-dashed border-black/10 bg-[#f5eedd] px-5 pt-5 font-serif">
+      <div className="absolute inset-0 top-7 rounded-b-[3px] border-t border-dashed border-black/10 bg-[linear-gradient(170deg,#f8f2e3,#ece2cb)] px-5 pt-5 font-serif">
         <p className="text-xs text-black/50">발신</p>
         <p className="text-sm font-bold">{fromNick}</p>
         <div className="absolute top-4 right-4 rotate-[-8deg]">
@@ -147,49 +200,6 @@ function Envelope({ torn, fromNick }: { torn: boolean; fromNick: string }) {
         <div className="mt-7 h-px w-40 bg-black/15" />
         <div className="mt-3 h-px w-28 bg-black/15" />
       </div>
-    </div>
-  );
-}
-
-function FoldedPaper({ unfolding }: { unfolding: boolean }) {
-  const panel = "paper absolute inset-x-0 h-1/3 backface-hidden";
-  return (
-    <div className="relative h-[390px] w-[280px] [transform-style:preserve-3d]">
-      {/* 가운데 */}
-      <div className={`${panel} top-1/3 border-y-0 px-5`}>
-        <Lines n={5} />
-      </div>
-      {/* 위 */}
-      <motion.div
-        className={`${panel} top-0 border-b-0 px-5 pt-5`}
-        style={{ transformOrigin: "bottom", transformStyle: "preserve-3d" }}
-        initial={{ rotateX: -178 }}
-        animate={{ rotateX: unfolding ? 0 : -178 }}
-        transition={{ duration: 0.6, delay: 0.55, ease: [0.3, 0.7, 0.2, 1] }}
-      >
-        <p className="text-center font-serif text-lg font-black tracking-[0.5em]">통고서</p>
-        <Lines n={3} />
-      </motion.div>
-      {/* 아래 */}
-      <motion.div
-        className={`${panel} bottom-0 border-t-0 px-5`}
-        style={{ transformOrigin: "top", transformStyle: "preserve-3d" }}
-        initial={{ rotateX: 178 }}
-        animate={{ rotateX: unfolding ? 0 : 178 }}
-        transition={{ duration: 0.6, ease: [0.3, 0.7, 0.2, 1] }}
-      >
-        <Lines n={4} />
-      </motion.div>
-    </div>
-  );
-}
-
-function Lines({ n }: { n: number }) {
-  return (
-    <div className="space-y-3 pt-4">
-      {Array.from({ length: n }, (_, i) => (
-        <div key={i} className="h-1.5 rounded bg-black/10" style={{ width: `${90 - ((i * 17) % 35)}%` }} />
-      ))}
     </div>
   );
 }

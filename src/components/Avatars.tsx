@@ -26,8 +26,8 @@ export function DefendantAvatar({ size = 72, className = "" }: P) {
 export function JudgeAvatar({ size = 72, className = "" }: P) {
   return (
     <svg width={size} height={size} viewBox="0 0 100 100" className={className} aria-hidden fill="currentColor">
-      <circle cx="50" cy="32" r="16" />
-      <path d="M34 26c0-10 7-16 16-16s16 6 16 16c-5-4-10-5-16-5s-11 1-16 5z" opacity=".6" />
+      <circle cx="50" cy="32" r="16" fill="#d8c2a4" />
+      <path d="M34 26c0-10 7-16 16-16s16 6 16 16c-5-4-10-5-16-5s-11 1-16 5z" fill="#3a2a1c" />
       <path d="M10 100c0-20 13-34 30-38l10 12 10-12c17 4 30 18 30 38z" />
       <path d="M42 62l8 12 8-12-8 4z" fill="#fff" />
       <g transform="rotate(-30 80 70)">

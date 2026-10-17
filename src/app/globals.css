@@ -16,8 +16,9 @@
   --color-wood: #5e4029;
   --color-wood-dark: #2b1d13;
   --color-mat: #2e4337;
-  --color-court: #14161c;
-  --color-court-2: #1f222b;
+  --color-court: #1d120a;
+  --color-court-2: #2e1d11;
+  --color-brass: #c9a24a;
   --font-sans: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
   --font-serif: var(--font-noto-serif), "Noto Serif KR", "Nanum Myeongjo", serif;
   --font-type: var(--font-typewriter), "Nanum Gothic Coding", ui-monospace, monospace;
@@ -140,15 +141,67 @@ body {
   background-repeat: repeat-x;
 }
 
+/* 우편함 장면: 회벽 + 보도블록, 바닥 쪽이 가깝게 */
+.mailbox-scene {
+  background:
+    radial-gradient(ellipse 70% 40% at 50% 20%, rgb(255 246 225 / 0.7), transparent 70%),
+    linear-gradient(180deg, transparent 0 72%, rgb(0 0 0 / 0.18) 72% calc(72% + 2px), transparent calc(72% + 2px)),
+    repeating-linear-gradient(90deg, transparent 0 58px, rgb(0 0 0 / 0.08) 58px 60px) 0 72% / 100% 28% no-repeat,
+    linear-gradient(180deg, #e9e1d1 0%, #ddd2be 72%, #bfb096 72%, #a99a80 100%);
+}
+
 /* 컷인 집중선 */
 .speed-lines {
   background: repeating-conic-gradient(from 0deg at 50% 50%, #fff 0deg 2deg, #000 2deg 9deg);
 }
 
+/* ── 법정: 호두나무 벽 패널 + 위에서 내려오는 따뜻한 조명 ── */
 .court-bg {
+  background-color: #2a190f;
+  background-image:
+    radial-gradient(ellipse 90% 45% at 50% 0%, rgb(255 205 140 / 0.22), transparent 70%),
+    repeating-linear-gradient(90deg, rgb(0 0 0 / 0.32) 0 2px, rgb(255 255 255 / 0.05) 2px 3px, transparent 3px 120px),
+    linear-gradient(180deg, transparent 0 230px, rgb(0 0 0 / 0.35) 230px 233px, rgb(255 220 170 / 0.06) 233px 236px, transparent 236px),
+    var(--wood-grain),
+    linear-gradient(180deg, #4b2f1c 0%, #33200f 45%, #1f130a 100%);
+  background-size: auto, auto, auto, 600px 600px, auto;
+  background-attachment: fixed;
+}
+
+/* 재판장 의자 등받이 (버건디 가죽 + 단추) */
+.court-chair {
   background:
-    radial-gradient(ellipse at 50% -10%, rgb(200 16 46 / 0.14), transparent 60%),
-    linear-gradient(180deg, #1b1e26 0%, #101217 100%);
+    radial-gradient(circle at 50% 30%, rgb(0 0 0 / 0.35) 2px, transparent 3px) 0 0 / 18px 18px,
+    linear-gradient(180deg, #7a1f24, #4a0f14);
+  box-shadow: inset 0 0 0 3px #3a0a0e, inset 0 8px 14px rgb(255 255 255 / 0.12), 0 6px 16px rgb(0 0 0 / 0.5);
+}
+
+/* 법대·진술대 앞판 */
+.court-bench,
+.court-stand {
+  background:
+    linear-gradient(180deg, #a87a4d 0 4px, #5a361d 4px 6px, transparent 6px),
+    repeating-linear-gradient(90deg, rgb(0 0 0 / 0.16) 0 1px, transparent 1px 34px),
+    var(--wood-grain),
+    linear-gradient(180deg, #7b5032, #4a2c17);
+  background-size: auto, auto, 600px 600px, auto;
+  box-shadow: 0 10px 18px -6px rgb(0 0 0 / 0.7), inset 0 -3px 0 rgb(0 0 0 / 0.3);
+}
+.court-bench {
+  border-radius: 3px 3px 0 0;
+}
+
+/* 놋쇠 명패 */
+.brass-plate {
+  background: linear-gradient(180deg, #f3dc95, #c9a24a 55%, #9c7a2c);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.6), 0 1px 2px rgb(0 0 0 / 0.6);
+}
+
+/* 대사창: 먹색 판 + 놋쇠 이중 테 */
+.court-dialog {
+  background: linear-gradient(180deg, rgb(20 12 6 / 0.92), rgb(12 7 3 / 0.95));
+  border: 2px solid #c9a24a;
+  box-shadow: 0 0 0 3px #1a0f07, 0 0 0 4px rgb(201 162 74 / 0.5), 0 12px 24px rgb(0 0 0 / 0.5);
 }
 
 }

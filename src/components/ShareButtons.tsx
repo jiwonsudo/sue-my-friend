@@ -79,7 +79,7 @@ export function ShareButtons({
 
   const btn = "min-h-11 rounded-[2px] px-4 font-serif text-[15px] font-bold transition active:translate-y-px";
   return (
-    <div className={`grid gap-2 ${compact ? "grid-cols-2" : "grid-cols-1"}`}>
+    <div className={`grid grid-cols-1 ${compact ? "gap-1.5" : "gap-2"}`}>
       {KAKAO_KEY && (
         <Script
           src="https://t1.kakaocdn.net/kakao_js_sdk/2.7.4/kakao.min.js"
