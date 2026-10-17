@@ -48,7 +48,7 @@ export function JudgmentDocument(p: JudgmentDocumentProps) {
         <RubberStamp text={p.verdictLabel} className="-rotate-6" />
       </div>
       {p.executed && (
-        <div className="pointer-events-none absolute top-1/3 left-1/2 -translate-x-1/2 -rotate-12">
+        <div className="pointer-events-none absolute bottom-24 left-6 -rotate-12">
           <RubberStamp text="집행 완료" className="bg-paper/40 px-4 text-3xl" />
         </div>
       )}
