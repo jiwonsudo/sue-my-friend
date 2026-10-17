@@ -48,6 +48,8 @@ pnpm exec supabase start -x studio,imgproxy,edge-runtime,logflare,vector,supavis
 | `ADS_TXT` | | `/ads.txt` 내용 (Ad Manager 판매자 확인) |
 | `NEXT_PUBLIC_AD_MOCK` | | `1`이면 배포에서도 가짜 광고 (테스트용) |
 | `AI_LAWYER_BUDGET_KRW` | | AI 변호인 1회 비용 상한(원). 기본 40 |
+| `NEXT_PUBLIC_OPERATOR_NAME` | | 약관·개인정보처리방침의 운영자(보호책임자) 이름 |
+| `NEXT_PUBLIC_CONTACT_EMAIL` | | 약관·개인정보처리방침의 문의 이메일. 비우면 '[신고] 기능'으로 안내 |
 | `NEXT_PUBLIC_KAKAO_JS_KEY` | | 카카오 JS 키. 없으면 [카톡으로 보내기]가 Web Share → 링크 복사로 대체 |
 | `NEXT_PUBLIC_SITE_URL` | ✓ | 예: `https://sue-my-friend.vercel.app` (링크·OG 이미지 절대 경로, Origin 검사에 사용) |
 | `PROMPT_CANARY` | ✓ | 시스템 프롬프트 끝에 붙는 랜덤 문자열. 출력에 나오면 유출로 보고 폐기 |

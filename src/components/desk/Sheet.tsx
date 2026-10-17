@@ -8,6 +8,8 @@ export const FORM_NO = {
   docket: "친고 서식 제5호",
   judgment: "친고 서식 제9호",
   returned: "친고 서식 제0호",
+  terms: "친고 서식 제90호",
+  privacy: "친고 서식 제91호",
 } as const;
 
 export type SheetProps = {

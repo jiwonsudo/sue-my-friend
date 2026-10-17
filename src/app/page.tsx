@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { LegalLinks } from "@/components/LegalLinks";
 import { Desk } from "@/components/desk/Desk";
 import { PostIt } from "@/components/desk/PostIt";
 import { PaperClip } from "@/components/desk/props";
@@ -35,8 +36,8 @@ export default async function Landing({ searchParams }: { searchParams: Promise<
         <LandingIntake />
       </div>
 
-      <section aria-label="지난 판결문" className="relative mt-10">
-        <p className="mb-2 -rotate-1 font-hand text-[22px] text-paper/80">지난 판결문 (처리 완료)</p>
+      <section aria-label="예시 판결문" className="relative mt-10">
+        <p className="mb-2 -rotate-1 font-hand text-[22px] text-paper/80">예시 판결문 (실제 사건 아님)</p>
         <div className="relative">
           <PaperClip className="absolute -top-4 left-8 z-20 h-16 w-6 rotate-[8deg]" />
           <JudgmentDocument
@@ -65,6 +66,9 @@ export default async function Landing({ searchParams }: { searchParams: Promise<
           className="relative -mt-2 ml-5 rotate-[-2.4deg]"
         />
       </section>
+      <p className="mt-10 text-center font-type text-[12px] text-paper/60">
+        <LegalLinks />
+      </p>
     </Desk>
   );
 }

@@ -1,7 +1,7 @@
 -- 친구 고소하기: 초기 스키마
 -- 모든 읽기·쓰기는 서버(service role)에서만 한다. anon/authenticated 는 전부 차단.
 
-create extension if not exists pgcrypto;
+create extension if not exists pgcrypto with schema extensions;
 
 -- 사건번호 순번 (연도별)
 create table case_counters (
@@ -29,7 +29,7 @@ create table cases (
   defendant_response text check (defendant_response in ('accept', 'object', 'countersue', 'ignore')),
   regen_count int not null default 0,
   -- 피고·배심원 토큰 파생용 salt (토큰 원문은 저장하지 않는다)
-  token_salt text not null default encode(gen_random_bytes(16), 'hex'),
+  token_salt text not null default encode(extensions.gen_random_bytes(16), 'hex'),
   created_at timestamptz not null default now()
 );
 
