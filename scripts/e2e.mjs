@@ -181,6 +181,12 @@ const t7 = await T7.req(`/t/${l7.def}`);
 ok(t7.status === 307 && t7.res.headers.get("location").endsWith(`/case/${c7}/trial?as=defendant`) && T7.header().includes("smf_"), "차례 알림 링크 → 공방 화면 + 피고 쿠키");
 ok((await T7.req(`/case/${c7}/trial?as=defendant`)).status === 200 && (await new Jar("x", "10.12.0.5").req(`/case/${c7}/trial`)).data.includes("공방 당사자만"), "알림 링크로만 입장, 남은 불가");
 
+console.log("\n[11-1] 세부 사건 유형");
+const P8 = new Jar("p8", "10.13.0.1");
+const nt = await P8.req("/api/draft", { method: "POST", json: { input: { type: "dutch", plaintiff_nick: "지원", defendant_nick: "민수", incident_date: "2026-10-01", situation: "회식 2차 정산 안 함", demand: "17,500원" }, tone: "기본" } });
+ok(nt.status === 200 && sql(`select type from cases where id='${nt.data.caseId}'`) === "dutch", "새 세부 유형(더치페이 미정산) 접수");
+ok((await P8.req("/api/draft", { method: "POST", json: { input: { type: "chicken", plaintiff_nick: "a", defendant_nick: "b", incident_date: "2026-10-01", situation: "x", demand: "y" }, tone: "기본" } })).status === 400, "없는 유형 거부");
+
 console.log("\n[12] IP당 시간당 초안 10회");
 const P6 = new Jar("p6", "10.11.0.1");
 let last;
