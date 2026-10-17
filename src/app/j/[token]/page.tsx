@@ -37,7 +37,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 export default async function JuryPage({ params }: Props) {
   const { token } = await params;
   const c = await caseForJury(token);
-  if (!c || c.status === "dismissed") return <Gate title="사건을 찾을 수 없습니다" body="링크가 올바르지 않거나 기각된 사건이에요." />;
+  if (!c || c.status === "dismissed") return <Gate title="사건을 찾을 수 없습니다" body="주소 오류 또는 기각된 사건." />;
+  if (!c.jury_invited_at) return <Gate title="배심원 모집 전인 사건입니다" body="당사자가 배심원을 초대하면 이 주소로 공방 기록 열람과 투표가 가능함." />;
 
   const [statements, votes, roles] = await Promise.all([fetchStatements(c.id), tallyVotes(c.id), rolesForCase(c.id)]);
   const nick = (r: "plaintiff" | "defendant") => (r === "plaintiff" ? c.plaintiff_nick : c.defendant_nick);

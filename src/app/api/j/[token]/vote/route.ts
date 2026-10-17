@@ -19,6 +19,7 @@ export const POST = handle<Ctx>(async (req, { params }) => {
   const found = await resolveToken(token);
   if (!found || found.role !== "jury") fail(404, "사건을 찾을 수 없습니다.");
   const c = await requireCase(found.caseId);
+  if (!c.jury_invited_at) fail(409, "배심원을 모집하지 않은 사건입니다.");
   if (c.status !== "trial" && c.status !== "voting") fail(409, "투표가 마감되었습니다.");
   if ((await rolesForCase(c.id)).length > 0) fail(403, "당사자는 투표할 수 없어요.");
 

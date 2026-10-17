@@ -42,6 +42,7 @@ export async function buildTrialView(c: CaseRow, me: Role | null): Promise<Trial
     evidence,
     current: slot ? { ...slot, deadline: new Date(new Date(last).getTime() + TURN_WINDOW_MS).toISOString() } : null,
     votingDeadline: c.voting_deadline_at,
+    juryInvited: !!c.jury_invited_at,
     votes,
   };
 }

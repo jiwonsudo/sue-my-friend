@@ -31,9 +31,9 @@ export const LIMITS = {
 } as const;
 
 export const HOUR = 60 * 60 * 1000;
-export const RESPONSE_WINDOW_MS = 24 * HOUR;
-export const TURN_WINDOW_MS = 24 * HOUR;
-export const VOTING_WINDOW_MS = 24 * HOUR;
+export const RESPONSE_WINDOW_MS = 12 * HOUR;
+export const TURN_WINDOW_MS = 6 * HOUR;
+export const VOTING_WINDOW_MS = 6 * HOUR;
 
 export const DEFENSE_CARDS = [
   {

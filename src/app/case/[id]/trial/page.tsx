@@ -36,8 +36,8 @@ export default async function TrialPage({
   return (
     <TrialClient
       initial={await buildTrialView(c, me)}
-      juryLink={links.jury}
-      juryImage={`${origin}/api/og/jury/${links.jury.split("/j/")[1]}`}
+      juryLink={c.jury_invited_at ? links.jury : null}
+      juryImage={c.jury_invited_at ? `${origin}/api/og/jury/${links.jury.split("/j/")[1]}` : null}
       canSwitch={roles.length > 1}
     />
   );

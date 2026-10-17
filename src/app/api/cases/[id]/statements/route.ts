@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { CARD_IDS, LIMITS, VOTING_WINDOW_MS } from "@/lib/constants";
+import { CARD_IDS, LIMITS } from "@/lib/constants";
 import { currentSlot, rebuttalTarget, TRIAL_SLOTS } from "@/lib/trial";
 import { requireRole } from "@/server/auth";
-import { fetchStatements, requireCase, startVoting } from "@/server/cases";
+import { fetchStatements, finishTrial, requireCase } from "@/server/cases";
 import { assertSameOrigin, fail, handle, readJson } from "@/server/http";
 import { sanitize } from "@/server/llm";
 import { db } from "@/server/supabase";
@@ -72,7 +72,7 @@ export const POST = handle<Ctx>(async (req, { params }) => {
   if (error) fail(409, "이미 진술이 제출되었습니다.");
 
   if (statements.length + 1 >= TRIAL_SLOTS.length) {
-    await startVoting(c.id, new Date(Date.now() + VOTING_WINDOW_MS));
+    await finishTrial(c, new Date());
   }
   return NextResponse.json({ ok: true });
 });
