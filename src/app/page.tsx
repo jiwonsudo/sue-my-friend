@@ -1,103 +1,83 @@
-import Image from "next/image";
+import Link from "next/link";
+import { Disclaimer } from "@/components/Disclaimer";
+import { Header } from "@/components/Header";
+import { JudgmentDocument } from "@/components/JudgmentDocument";
+import { CASE_TYPES } from "@/lib/constants";
 
-export default function Home() {
+export default async function Landing({ searchParams }: { searchParams: Promise<{ expired?: string }> }) {
+  const { expired } = await searchParams;
   return (
-    <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="font-mono list-inside list-decimal text-sm/6 text-center sm:text-left">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] font-mono font-semibold px-1 py-0.5 rounded">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+    <>
+      <Header />
+      <main className="mx-auto max-w-md px-5 pb-16">
+        {expired && (
+          <p className="mt-4 rounded-lg bg-black/5 px-3 py-2 text-sm text-muted">링크가 만료되었거나 올바르지 않아요.</p>
+        )}
+        <section className="pt-12 pb-8">
+          <p className="mb-3 text-sm font-semibold text-seal">사소한 원한, 엄중한 형식</p>
+          <h1 className="text-[32px] leading-[1.25] font-extrabold tracking-tight">
+            치킨 한 마리,
+            <br />
+            이제 법의 언어로
+            <br />
+            받아내세요.
+          </h1>
+          <p className="mt-4 text-[15px] leading-relaxed text-muted">
+            내기 안 지킨 친구에게 아주 진지한 통고서를 보내세요. 버티면 공방, 배심원 투표, 판결까지 갑니다.
+          </p>
+        </section>
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+        <div className="mb-3 flex flex-wrap gap-2">
+          {CASE_TYPES.map((t) => (
+            <Link
+              key={t.id}
+              href={`/new?type=${t.id}`}
+              className="min-h-11 rounded-full border border-black/10 px-4 py-2.5 text-sm font-medium hover:border-black/40"
+            >
+              {t.label}
+            </Link>
+          ))}
         </div>
+
+        <section className="mt-10 space-y-4">
+          <p className="text-xs font-semibold tracking-wider text-muted">실제 판결 예시</p>
+          <JudgmentDocument
+            compact
+            caseNo="2026킹-0042"
+            title="치킨 1마리 지급 이행 청구"
+            plaintiff="지원"
+            defendant="민수"
+            order="피고는 원고에게 뿌링클 1마리를 7일 이내에 이행하라."
+            reason=""
+            date="2026. 10. 3."
+            verdictLabel="원고 승소"
+            className="rotate-[-1.2deg]"
+          />
+          <JudgmentDocument
+            compact
+            caseNo="2026킹-0057"
+            title="읽고 답하지 아니한 행위에 관한 건"
+            plaintiff="서연"
+            defendant="도윤"
+            order="피고는 원고에게 사과 메시지 3줄의 절반을 이행하라. 나머지 절반은 서로 잊는다."
+            reason=""
+            date="2026. 10. 9."
+            verdictLabel="쌍방 과실"
+            className="rotate-[0.8deg]"
+          />
+        </section>
+
+        <Disclaimer className="mt-8" />
       </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
+
+      <div className="fixed inset-x-0 bottom-0 z-20 bg-gradient-to-t from-white via-white to-white/0 px-5 pt-6 pb-[max(16px,env(safe-area-inset-bottom))]">
+        <Link
+          href="/new"
+          className="mx-auto flex min-h-14 max-w-md items-center justify-center rounded-2xl bg-seal text-[17px] font-bold text-white shadow-lg shadow-seal/20 active:scale-[0.99]"
         >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
-    </div>
+          통고서 보내기
+        </Link>
+      </div>
+    </>
   );
 }
