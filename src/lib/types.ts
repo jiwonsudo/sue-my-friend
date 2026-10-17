@@ -1,3 +1,4 @@
+import type { LawyerSuggestion } from "./laws";
 import type { CardId, CaseType } from "./constants";
 
 export type Role = "plaintiff" | "defendant";
@@ -59,6 +60,9 @@ export type StatementRow = {
   target_sentence_idx: number | null;
   card_id: CardId | null;
   evidence_id: string | null;
+  /** 변호인이 인용한 조항 (src/lib/laws.ts id) */
+  law_id: string | null;
+  lawyer_use_id: string | null;
   forfeited: boolean;
   created_at: string;
 };
@@ -101,4 +105,6 @@ export type TrialView = {
   statements: StatementRow[];
   evidence: PublicEvidence[];
   current: (TrialSlot & { deadline: string }) | null;
+  /** 내 반박 차례일 때만: 이번 차례 변호인 선임 여부와 추천 */
+  lawyer: { used: boolean; suggestions: LawyerSuggestion[] | null } | null;
 };

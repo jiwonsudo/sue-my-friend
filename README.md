@@ -44,6 +44,10 @@ pnpm exec supabase start -x studio,imgproxy,edge-runtime,logflare,vector,supavis
 | `ANTHROPIC_MODEL` | ✓ | 기본 `claude-sonnet-5-5` (사건당 200원 상한 기준). Opus 는 200원 안에서 재생성 횟수가 줄어듦 |
 | `AI_BUDGET_KRW_PER_CASE` | | 사건 1건당 AI 비용 상한(원). 기본 200 |
 | `KRW_PER_USD` | | 상한 계산용 환율. 기본 1400 |
+| `NEXT_PUBLIC_GAM_REWARDED_UNIT` | | Google Ad Manager 보상형 광고 단위. 비우면 배포에서 변호인 기능 숨김 |
+| `ADS_TXT` | | `/ads.txt` 내용 (Ad Manager 판매자 확인) |
+| `NEXT_PUBLIC_AD_MOCK` | | `1`이면 배포에서도 가짜 광고 (테스트용) |
+| `AI_LAWYER_BUDGET_KRW` | | AI 변호인 1회 비용 상한(원). 기본 40 |
 | `NEXT_PUBLIC_KAKAO_JS_KEY` | | 카카오 JS 키. 없으면 [카톡으로 보내기]가 Web Share → 링크 복사로 대체 |
 | `NEXT_PUBLIC_SITE_URL` | ✓ | 예: `https://sue-my-friend.vercel.app` (링크·OG 이미지 절대 경로, Origin 검사에 사용) |
 | `PROMPT_CANARY` | ✓ | 시스템 프롬프트 끝에 붙는 랜덤 문자열. 출력에 나오면 유출로 보고 폐기 |
@@ -120,6 +124,16 @@ supabase/migrations/          DB 스키마 (RLS 전면 차단)
 - 초안은 AI 재판장 몫(입력 8천 + 출력 3천 토큰)을 남겨 두고 쓴다. 남은 예산으로 초안이 잘릴 정도면 재생성을 거절한다("AI 사용 한도에 도달").
 - AI 재판장도 남은 예산이 모자라면 부르지 않고 규칙 기반으로 판결한다.
 - 생각(thinking) 토큰도 출력 요금이라 두 호출 모두 `effort: "low"`.
+
+### 광고 보상형 AI 변호인
+
+- 내 반박 차례(1·2라운드)마다 1번, [광고 보고 변호인 선임] → 보상형 광고 시청 → AI 변호인이 법 조항을 인용한 이의 2~3개를 추천 → 하나 골라 제출.
+- 인용 조항은 `src/lib/laws.ts`의 실존 조항 목록(요지)에서만 고른다. 목록 밖 조항은 버리고, 키가 없거나 실패하면 정해진 문장으로 추천.
+- 광고 확인: 광고를 띄우기 직전 서버가 일회용 티켓을 발급하고(`lawyer_uses`), 발급 후 5초가 지나야 선임된다. 웹 보상형 광고(GPT)는 서버 측 보상 검증이 없어서 이 정도가 한계다.
+- 보여 줄 광고가 없으면(no fill, 데스크톱 등) 그 차례는 무료로 선임해 준다.
+- 변호인이 인용한 진술은 AI 재판장에게 가산점(프롬프트), 규칙 기반 판결에서는 1건당 +0.5점.
+- 비용: 1회 `AI_LAWYER_BUDGET_KRW`(기본 40원) 상한, 사건당 200원과 별도.
+- Google Ad Manager 설정: 계정 → 사이트 등록·승인 → 보상형(Rewarded) 광고 단위 생성 → `NEXT_PUBLIC_GAM_REWARDED_UNIT`, `ADS_TXT` 환경변수. 보상형 웹 광고는 모바일 화면에서만 나온다.
 
 ### AI 재판장
 

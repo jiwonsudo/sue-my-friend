@@ -91,9 +91,26 @@ ok((await D.req(`/api/cases/${id}/evidence?as=defendant`, { method: "POST", body
 ok((await P.req(`/api/cases/${id}/evidence/${ev.data.id}?as=plaintiff`, { method: "PATCH", json: { label: "남의 증거" } })).status === 403, "남의 증거 이름 수정 불가");
 ok((await D.req(`/api/cases/${id}/evidence/${ev.data.id}?as=defendant`, { method: "PATCH", json: { label: "카톡 캡처" } })).status === 200, "내 증거 이름 수정");
 ok((await D.req(`/api/cases/${id}/statements`, { method: "POST", json: { sentences: ["주말이 세 번이 아니라 두 번입니다."] } })).status === 400, "반박 대상 문장 필수");
-ok((await D.req(`/api/cases/${id}/statements`, { method: "POST", json: { sentences: ["주말은 두 번입니다."], targetSentenceIdx: 2, cardId: "amusement", evidenceId: ev.data.id } })).status === 200, "R1 피고 반박(문장 선택+카드+증거)");
+console.log("\n[3-1] 광고 보상형 AI 변호인");
+ok((await P.req(`/api/cases/${id}/lawyer`, { method: "POST", json: { action: "ticket" } })).status === 403, "상대 차례에는 변호인 선임 불가");
+const tk = await D.req(`/api/cases/${id}/lawyer`, { method: "POST", json: { action: "ticket" } });
+ok(tk.status === 200 && tk.data.ticket && tk.data.minAdMs >= 1000, "광고 티켓 발급");
+ok((await D.req(`/api/cases/${id}/lawyer`, { method: "POST", json: { action: "grant", ticket: tk.data.ticket } })).status === 409, "광고 시간 전에는 선임 불가");
+ok((await D.req(`/api/cases/${id}/lawyer`, { method: "POST", json: { action: "grant", ticket: "x".repeat(43) } })).status === 403, "엉뚱한 티켓 거부");
+await new Promise((r) => setTimeout(r, tk.data.minAdMs + 200));
+const gr = await D.req(`/api/cases/${id}/lawyer`, { method: "POST", json: { action: "grant", ticket: tk.data.ticket } });
+ok(gr.status === 200 && gr.data.suggestions?.length >= 2 && gr.data.suggestions.every((x) => x.lawId && x.sentence), "변호인 추천 2~3개");
+ok((await D.req(`/api/cases/${id}/lawyer`, { method: "POST", json: { action: "ticket" } })).status === 409, "같은 차례 두 번 선임 불가");
+ok((await D.req(`/api/cases/${id}/statements`, { method: "POST", json: { sentences: ["주말은 두 번입니다."], targetSentenceIdx: 2, lawId: "const-10" === gr.data.suggestions[0].lawId ? "civil-2-x" : "civil-x" } })).status === 400, "추천받지 않은 조항 인용 불가");
+const tv1 = await D.req(`/api/cases/${id}/trial?as=defendant`);
+ok(tv1.data.lawyer?.used === true && tv1.data.lawyer.suggestions?.length >= 2, "새로고침해도 추천 유지");
+ok((await D.req(`/api/cases/${id}/statements`, { method: "POST", json: { sentences: ["주말은 두 번입니다."], targetSentenceIdx: 2, cardId: "amusement", evidenceId: ev.data.id, lawId: gr.data.suggestions[0].lawId } })).status === 200, "R1 피고 반박(문장 선택+카드+증거+변호인 인용)");
+ok(sql(`select law_id from statements where case_id='${id}' and round=1 and role='defendant'`) === gr.data.suggestions[0].lawId, "인용 조항 저장");
 ok((await D.req(`/api/cases/${id}/statements`, { method: "POST", json: { sentences: ["저는 치킨을 사려 했습니다.", "가게가 문을 닫았습니다."] } })).status === 200, "R2 피고 증언");
-ok((await P.req(`/api/cases/${id}/statements`, { method: "POST", json: { sentences: ["그 가게는 24시간입니다."], targetSentenceIdx: 1, cardId: "delay" } })).status === 200, "R2 원고 반박");
+const tk2 = await P.req(`/api/cases/${id}/lawyer`, { method: "POST", json: { action: "ticket" } });
+await new Promise((r) => setTimeout(r, tk2.data.minAdMs + 200));
+const gr2 = await P.req(`/api/cases/${id}/lawyer`, { method: "POST", json: { action: "grant", ticket: tk2.data.ticket } });
+ok((await P.req(`/api/cases/${id}/statements`, { method: "POST", json: { sentences: ["그 가게는 24시간입니다."], targetSentenceIdx: 1, cardId: "delay", lawId: gr2.data.suggestions[0].lawId } })).status === 200, "R2 원고 반박 (변호인 인용)");
 ok((await P.req(`/api/cases/${id}/statements`, { method: "POST", json: { sentences: ["치킨은 식기 전에 받아야 합니다.", "두 문장"] } })).status === 400, "최후진술 1문장 제한");
 const preHtml = (await P.req(`/case/${id}/trial?as=plaintiff`)).data;
 ok(!/\/j\/[A-Za-z0-9_-]{40,}/.test(preHtml) && preHtml.includes(`/t/${def}`), "공방 화면: 배심원 링크 없음, 피고 차례 알림 링크 있음");
@@ -109,7 +126,7 @@ console.log("\n[4] 판결");
 const vpage = await stranger.req(`/v/${id}`);
 // 판결문 본문은 망치 연출 뒤 클라이언트에서 그려지므로 서버가 내려준 주문 문구로 확인
 ok(vpage.status === 200 && vpage.data.includes(sql(`select order_text from judgments where case_id='${id}'`)), "판결 페이지에 주문");
-ok(sql(`select verdict from judgments where case_id='${id}'`) === "both", "키 없을 때 규칙 판결: 양측 진술 수 같으면 쌍방 과실");
+ok(sql(`select verdict from judgments where case_id='${id}'`) === "both", "키 없을 때 규칙 판결: 진술 수·변호인 인용 같으면 쌍방 과실");
 
 console.log("\n[5] 집행");
 ok((await P.req(`/api/cases/${id}/execution`, { method: "POST", body: png() })).status === 403, "승소 측은 인증 업로드 불가");

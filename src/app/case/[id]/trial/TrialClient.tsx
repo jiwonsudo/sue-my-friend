@@ -8,11 +8,13 @@ import { DefendantAvatar, JudgeAvatar, PlaintiffAvatar } from "@/components/Avat
 import { Countdown } from "@/components/Countdown";
 import { CutIn } from "@/components/CutIn";
 import { Header } from "@/components/Header";
+import { adsAvailable, RewardedAd } from "@/components/RewardedAd";
 import { ShareButtons } from "@/components/ShareButtons";
 import { Typewriter } from "@/components/Typewriter";
 import { api } from "@/lib/client/api";
 import { isMuted, setMuted } from "@/lib/client/sfx";
 import { CUTIN_LINES, DEFENSE_CARDS, LIMITS } from "@/lib/constants";
+import { LAW_BY_ID, lawLabel, type LawyerSuggestion } from "@/lib/laws";
 import { KIND_LABEL, otherRole, rebuttalTarget, ROLE_LABEL } from "@/lib/trial";
 import type { PublicEvidence, Role, StatementRow, TrialView } from "@/lib/types";
 
@@ -197,6 +199,8 @@ export function TrialClient({
             <p className="py-3 text-center font-type text-[13px] text-white/70">판결 선고 대기 중</p>
           ) : myTurn && view.current ? (
             <Compose
+              // 차례가 바뀌면 입력·선택한 조항을 새로 시작
+              key={`${view.current.round}-${view.current.kind}`}
               view={view}
               onDone={() => {
                 setShowNotify(true);
@@ -361,6 +365,11 @@ function StatementCard({
               <li key={i}>{s.kind === "testimony" ? `${i + 1}. ${t}` : t}</li>
             ))}
           </ol>
+          {s.law_id && LAW_BY_ID.get(s.law_id) && (
+            <p className="mt-2 inline-block border border-brass/60 bg-brass/10 px-2 py-0.5 font-type text-[11px] text-[#f0d896]">
+              변호인 인용 · {lawLabel(LAW_BY_ID.get(s.law_id)!)}
+            </p>
+          )}
           {(card || ev) && (
             <div className="mt-2 flex flex-wrap gap-2">
               {card && <span className="border border-amber-300/60 px-2 py-1 font-type text-[11.5px] text-amber-200">항변 {card.name}</span>}
@@ -386,6 +395,7 @@ function Compose({ view, onDone }: { view: TrialView; onDone: () => void }) {
   const slot = view.current!;
   const [lines, setLines] = useState<string[]>([""]);
   const [targetIdx, setTargetIdx] = useState<number | null>(null);
+  const [lawId, setLawId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const target = slot.kind === "rebuttal" ? rebuttalTarget(view.statements, slot.round) : null;
@@ -402,7 +412,7 @@ function Compose({ view, onDone }: { view: TrialView; onDone: () => void }) {
     setError(null);
     try {
       await api(`/api/cases/${view.caseId}/statements`, {
-        json: { sentences: filled, targetSentenceIdx: chosen },
+        json: { sentences: filled, targetSentenceIdx: chosen, lawId },
       });
       setLines([""]);
       onDone();
@@ -456,6 +466,26 @@ function Compose({ view, onDone }: { view: TrialView; onDone: () => void }) {
         </div>
       )}
 
+      {slot.kind === "rebuttal" && view.lawyer && (
+        <LawyerPanel
+          caseId={view.caseId}
+          initial={view.lawyer}
+          chosenLawId={lawId}
+          onPick={(sg) => {
+            setLawId(sg.lawId);
+            if (sg.targetIdx != null) setTargetIdx(sg.targetIdx);
+            setLines([sg.sentence]);
+          }}
+        />
+      )}
+      {lawId && LAW_BY_ID.get(lawId) && (
+        <p className="flex items-center justify-between gap-2 border border-brass/60 bg-brass/10 px-2.5 py-1.5 font-type text-[11.5px] text-[#f0d896]">
+          <span>변호인 인용 · {lawLabel(LAW_BY_ID.get(lawId)!)}</span>
+          <button type="button" className="min-h-8 px-1 text-white/50 underline" onClick={() => setLawId(null)}>
+            빼기
+          </button>
+        </p>
+      )}
       {lines.map((l, i) => (
         <input
           key={i}
@@ -482,6 +512,114 @@ function Compose({ view, onDone }: { view: TrialView; onDone: () => void }) {
         {busy ? "제출 중" : slot.kind === "rebuttal" ? "이의 있음!" : `${label} 제출`}
       </button>
       {missing && !busy && <p className="-mt-1 text-center font-type text-[12px] text-[#ffb3a8]">{missing}</p>}
+    </div>
+  );
+}
+
+/**
+ * 광고 보상형 AI 변호인: 반박 차례마다 1번. 광고를 보면 법 조항을 인용한 이의 2~3개를 추천받고 하나를 골라 제출한다.
+ * 고른 이의는 재판장이 가산점을 준다.
+ */
+function LawyerPanel({
+  caseId,
+  initial,
+  chosenLawId,
+  onPick,
+}: {
+  caseId: string;
+  initial: NonNullable<TrialView["lawyer"]>;
+  chosenLawId: string | null;
+  onPick: (s: LawyerSuggestion) => void;
+}) {
+  const [suggestions, setSuggestions] = useState<LawyerSuggestion[] | null>(initial.suggestions);
+  const [phase, setPhase] = useState<"idle" | "ad" | "working">("idle");
+  const [error, setError] = useState<string | null>(null);
+  const ticket = useRef<{ value: string; at: number; minMs: number } | null>(null);
+
+  if (initial.used && !suggestions) return null;
+  if (!suggestions && !adsAvailable) return null;
+
+  const start = async () => {
+    setError(null);
+    try {
+      const r = await api<{ ticket: string; minAdMs: number }>(`/api/cases/${caseId}/lawyer`, { json: { action: "ticket" } });
+      ticket.current = { value: r.ticket, at: Date.now(), minMs: r.minAdMs };
+      setPhase("ad");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "광고를 불러오지 못했습니다.");
+    }
+  };
+
+  const grant = async () => {
+    const t = ticket.current;
+    if (!t) return;
+    setPhase("working");
+    // 광고가 너무 빨리 끝났으면(광고 없음 등) 서버 최소 시간까지 기다린다
+    const wait = t.at + t.minMs + 300 - Date.now();
+    if (wait > 0) await new Promise((r) => setTimeout(r, wait));
+    try {
+      const r = await api<{ suggestions: LawyerSuggestion[] }>(`/api/cases/${caseId}/lawyer`, { json: { action: "grant", ticket: t.value } });
+      setSuggestions(r.suggestions);
+      setPhase("idle");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "선임 실패");
+      setPhase("idle");
+    }
+  };
+
+  return (
+    <div className="border border-brass/40 bg-[#2a1a0e] p-3">
+      {!suggestions ? (
+        <>
+          <p className="font-serif text-[14px] font-bold text-[#f0d896]">변호인 선임</p>
+          <p className="mt-1 font-type text-[11.5px] leading-relaxed text-white/60">
+            광고를 끝까지 보면 AI 변호인이 법 조항을 인용한 이의를 써 줌. 변호인을 쓴 진술은 재판장이 가산점을 줌. 이번 반박 차례에 1번.
+          </p>
+          <button
+            type="button"
+            disabled={phase !== "idle"}
+            onClick={start}
+            className="brass-plate mt-2.5 min-h-12 w-full font-serif text-[15px] font-bold text-[#2a1a0c] disabled:opacity-50"
+          >
+            {phase === "working" ? "변호인이 검토 중" : "광고 보고 변호인 선임"}
+          </button>
+        </>
+      ) : (
+        <>
+          <p className="font-serif text-[14px] font-bold text-[#f0d896]">변호인 의견 · 하나를 골라 제출</p>
+          <div role="radiogroup" aria-label="변호인 추천 이의" className="mt-2 space-y-1.5">
+            {suggestions.map((sg) => {
+              const law = LAW_BY_ID.get(sg.lawId);
+              const on = chosenLawId === sg.lawId;
+              return (
+                <button
+                  key={sg.lawId}
+                  type="button"
+                  role="radio"
+                  aria-checked={on}
+                  onClick={() => onPick(sg)}
+                  className={`block min-h-11 w-full border px-3 py-2 text-left ${on ? "border-brass bg-brass/15" : "border-white/15 bg-white/5"}`}
+                >
+                  {law && <span className="block font-type text-[11px] text-[#f0d896]">{lawLabel(law)}</span>}
+                  <span className="mt-0.5 block text-[14px] leading-snug">{sg.sentence}</span>
+                  {law && <span className="mt-1 block font-type text-[10.5px] leading-snug text-white/45">요지: {law.gist}</span>}
+                </button>
+              );
+            })}
+          </div>
+          <p className="mt-1.5 font-type text-[10px] text-white/40">게임용 인용이며 실제 법률 판단이 아님. 고른 뒤 문장은 고쳐 써도 됨.</p>
+        </>
+      )}
+      {error && <p className="mt-2 text-center text-[12.5px] text-red-300">{error}</p>}
+      {phase === "ad" && (
+        <RewardedAd
+          onReward={() => grant()}
+          onCancel={() => {
+            setPhase("idle");
+            setError("광고를 끝까지 봐야 선임됨.");
+          }}
+        />
+      )}
     </div>
   );
 }

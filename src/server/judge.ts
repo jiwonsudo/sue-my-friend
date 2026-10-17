@@ -4,6 +4,8 @@ import { DEFENSE_CARDS } from "@/lib/constants";
 import { KIND_LABEL, ROLE_LABEL } from "@/lib/trial";
 import type { CaseRow, StatementRow, Verdict } from "@/lib/types";
 import { addCaseCost, caseBudgetUsd, costOf, estimateInputTokens, JUDGE_MAX_OUTPUT, maxOutputTokens, model } from "./aiBudget";
+import { lawLabel } from "@/lib/laws";
+import { lawOf } from "./lawyer";
 import { sanitize } from "./llm";
 import { JUDGE_SYSTEM_PROMPT } from "./prompts/judge";
 
@@ -23,7 +25,8 @@ function transcript(c: CaseRow, statements: StatementRow[]): string {
     const target = s.target_statement_id ? statements.find((x) => x.id === s.target_statement_id) : null;
     const quoted = target && s.target_sentence_idx != null ? ` 반박 대상: 「${sanitize(target.sentences[s.target_sentence_idx] ?? "", 200)}」` : "";
     const card = DEFENSE_CARDS.find((d) => d.id === s.card_id);
-    return `${head}${quoted} ${s.sentences.map((t) => sanitize(t, 200)).join(" ")}${card ? ` (항변 카드: ${card.name})` : ""}${s.evidence_id ? " (증거 사진 제출)" : ""}`;
+    const law = lawOf(s.law_id);
+    return `${head}${quoted} ${s.sentences.map((t) => sanitize(t, 200)).join(" ")}${card ? ` (항변 카드: ${card.name})` : ""}${s.evidence_id ? " (증거 사진 제출)" : ""}${law ? ` (선임 변호인이 ${lawLabel(law)} 인용)` : ""}`;
   });
   return `<user_input>
 원고: ${sanitize(c.plaintiff_nick, 20)}
@@ -55,9 +58,12 @@ function leaked(text: string): boolean {
   return text.includes("user_input") || text.includes("시스템 프롬프트") || text.includes(JUDGE_SYSTEM_PROMPT.slice(0, 30));
 }
 
-/** 키가 없거나 호출이 실패했을 때: 진술을 포기한 턴이 적은 쪽이 이긴다. 같으면 쌍방 과실. */
+/**
+ * 키가 없거나 호출이 실패했을 때: 진술한 턴 수 + 변호인 인용 1건당 0.5점. 높은 쪽이 이기고 같으면 쌍방 과실.
+ */
 export function ruleBasedRuling(statements: StatementRow[]): Ruling {
-  const spoke = (r: "plaintiff" | "defendant") => statements.filter((s) => s.role === r && !s.forfeited).length;
+  const spoke = (r: "plaintiff" | "defendant") =>
+    statements.filter((s) => s.role === r && !s.forfeited).length + statements.filter((s) => s.role === r && s.law_id).length * 0.5;
   const p = spoke("plaintiff");
   const d = spoke("defendant");
   if (p === d) {
@@ -69,7 +75,7 @@ export function ruleBasedRuling(statements: StatementRow[]): Ruling {
   const winner = p > d ? "plaintiff" : "defendant";
   return {
     verdict: winner,
-    reason: `본 법정은 양측이 제출한 진술을 검토하였다. ${winner === "plaintiff" ? "피고" : "원고"}는 주어진 진술 기회 일부를 행사하지 아니하였고, 본 법정은 그 침묵을 불리하게 본다.`,
+    reason: `본 법정은 양측이 제출한 진술을 검토하였다. ${winner === "plaintiff" ? "원고" : "피고"}는 진술 기회를 성실히 행사하였거나 변호인을 선임하여 법리를 다투었고, 본 법정은 이를 유리하게 본다.`,
   };
 }
 

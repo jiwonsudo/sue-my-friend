@@ -7,6 +7,7 @@ import { fetchStatements, finishTrial, requireCase } from "@/server/cases";
 import { assertSameOrigin, fail, handle, readJson } from "@/server/http";
 import { sanitize } from "@/server/llm";
 import { db } from "@/server/supabase";
+import { fetchLawyerUse } from "@/server/lawyer";
 import { parse } from "@/server/validate";
 
 type Ctx = { params: Promise<{ id: string }> };
@@ -16,6 +17,8 @@ const bodySchema = z.object({
   targetSentenceIdx: z.number().int().min(0).max(3).nullish(),
   cardId: z.enum(CARD_IDS as [string, ...string[]]).nullish(),
   evidenceId: z.string().uuid().nullish(),
+  /** 선임한 변호인이 추천한 조항 (src/lib/laws.ts id) */
+  lawId: z.string().max(40).nullish(),
 });
 
 export const POST = handle<Ctx>(async (req, { params }) => {
@@ -64,8 +67,14 @@ export const POST = handle<Ctx>(async (req, { params }) => {
       if (!ev) fail(400, "증거를 찾을 수 없습니다.");
       row.evidence_id = ev.id;
     }
-  } else if (body.cardId || body.evidenceId) {
-    fail(400, "항변 카드와 증거는 반박에만 붙일 수 있어요.");
+    if (body.lawId) {
+      const used = await fetchLawyerUse(c.id, role, slot.round);
+      if (!used?.granted_at || !used.suggestions?.some((s) => s.lawId === body.lawId)) fail(400, "선임한 변호인이 추천한 조항만 인용할 수 있습니다.");
+      row.law_id = body.lawId;
+      row.lawyer_use_id = used.id;
+    }
+  } else if (body.cardId || body.evidenceId || body.lawId) {
+    fail(400, "항변 카드·증거·조항 인용은 반박에만 붙일 수 있어요.");
   }
 
   const { error } = await db().from("statements").insert(row);

@@ -62,3 +62,10 @@ export async function addCaseCost(caseId: string, usd: number) {
   if (usd <= 0) return;
   await db().rpc("add_ai_cost", { p_case_id: caseId, p_usd: Number(usd.toFixed(6)) });
 }
+
+/** AI 변호인 1회 비용 상한 (USD). 광고로 생긴 몫이라 사건 예산과 따로 센다. 기본 40원 */
+export function lawyerBudgetUsd(): number {
+  const krw = Number(process.env.AI_LAWYER_BUDGET_KRW ?? 40);
+  const rate = Number(process.env.KRW_PER_USD ?? 1400);
+  return krw / rate;
+}
