@@ -12,7 +12,7 @@ import { btn } from "@/components/desk/ui";
 import { JudgmentDocument, type JudgmentDocumentProps } from "@/components/JudgmentDocument";
 import { RubberStamp } from "@/components/Seal";
 import { api } from "@/lib/client/api";
-import { playGavel } from "@/lib/client/sfx";
+import { playGavel, playStamp } from "@/lib/client/sfx";
 import { LIMITS } from "@/lib/constants";
 import type { Role } from "@/lib/types";
 
@@ -39,7 +39,10 @@ export function JudgmentView({ caseId, me, loser, executed, hasProof, proofUrl, 
   const [execShown, setExecShown] = useState(executed);
   useEffect(() => {
     if (!executed || execShown) return;
-    const t = setTimeout(() => setExecShown(true), 200);
+    const t = setTimeout(() => {
+      setExecShown(true);
+      playStamp({ ink: true });
+    }, 200);
     return () => clearTimeout(t);
   }, [executed, execShown]);
 
@@ -58,6 +61,7 @@ export function JudgmentView({ caseId, me, loser, executed, hasProof, proofUrl, 
     if (phase !== "doc" || stamped) return;
     const t = setTimeout(() => {
       setStamped(true);
+      playStamp({ ink: true });
       navigator.vibrate?.(50);
     }, 650);
     return () => clearTimeout(t);

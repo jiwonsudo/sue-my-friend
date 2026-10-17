@@ -177,6 +177,10 @@ console.log("\n[11] 배심원 초대했지만 0표 → AI 재판장, 초대 전 
 const P7 = new Jar("p7", "10.12.0.1"), D7 = new Jar("d7", "10.12.0.2"), J7 = new Jar("j7", "10.12.0.3");
 const c7 = (await newCase(P7)).data.caseId; const l7 = await sendAndLink(P7, c7);
 await D7.req(`/api/c/${l7.def}/respond`, { method: "POST", json: { action: "object" } });
+const T7 = new Jar("t7", "10.12.0.4");
+const t7 = await T7.req(`/t/${l7.def}`);
+ok(t7.status === 307 && t7.res.headers.get("location").endsWith(`/case/${c7}/trial?as=defendant`) && T7.header().includes("smf_"), "차례 알림 링크 → 공방 화면 + 피고 쿠키");
+ok((await T7.req(`/case/${c7}/trial?as=defendant`)).status === 200 && (await new Jar("x", "10.12.0.5").req(`/case/${c7}/trial`)).data.includes("공방 당사자만"), "알림 링크로만 입장, 남은 불가");
 const inv7 = await P7.req(`/api/cases/${c7}/jury`, { method: "POST", json: {} });
 const jt7 = inv7.data.jury.split("/j/")[1];
 ok((await J7.req(`/j/${jt7}`)).status === 200, "초대 후 배심원 페이지 열림");

@@ -39,6 +39,11 @@ export default async function TrialPage({
       juryLink={c.jury_invited_at ? links.jury : null}
       juryImage={c.jury_invited_at ? `${origin}/api/og/jury/${links.jury.split("/j/")[1]}` : null}
       canSwitch={roles.length > 1}
+      notifyLinks={{
+        // 피고에게는 쿠키를 심어 주는 호출 링크, 원고는 사건을 만든 브라우저에 쿠키가 있으므로 공방 주소
+        defendant: `${origin}/t/${links.defendant.split("/c/")[1]}`,
+        plaintiff: `${origin}/case/${c.id}/trial?as=plaintiff`,
+      }}
     />
   );
 }

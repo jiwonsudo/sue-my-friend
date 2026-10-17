@@ -1,5 +1,6 @@
 "use client";
 
+import { playCrumple, playSlide, playStamp } from "@/lib/client/sfx";
 import { AnimatePresence, motion } from "framer-motion";
 import { useRouter } from "next/navigation";
 import { useCallback, useState } from "react";
@@ -63,6 +64,7 @@ export function NewCaseFlow({ initial, resume }: { initial: Pick<Input, "type" |
 
   const createDraft = () => {
     setMotionKind({ enter: "fade", exit: "fade" });
+    playStamp();
     window.scrollTo({ top: 0, behavior: "smooth" });
     return run("draft", async () => {
       const r = await atLeast(api<DraftRes>("/api/draft", { json: { input, tone: "기본" } }));
@@ -77,6 +79,8 @@ export function NewCaseFlow({ initial, resume }: { initial: Pick<Input, "type" |
   /** 더 킹받게: 구겨 버림 / 좀 순하게: 옆으로 밀어 둠 */
   const regen = (tone: Tone) => {
     setMotionKind({ enter: "fade", exit: tone === "더_킹받게" ? "crumple" : "aside" });
+    if (tone === "더_킹받게") playCrumple();
+    else playSlide();
     return run(tone, async () => {
       const r = await atLeast(api<DraftRes>("/api/draft", { json: { caseId, tone } }));
       setMotionKind({ enter: "print", exit: "fade" });

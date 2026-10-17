@@ -70,5 +70,5 @@ export const CARD_NOTICE = "게임 카드이며 실제 법률 판단이 아닙�
 export const CUTIN_LINES = [
   "잠깐, 그 말 취소해!",
   "증거 있습니다!",
-  "재판장님, 이건 말이 안 됩니다",
+  "이의 있소!",
 ] as const;

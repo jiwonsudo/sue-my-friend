@@ -1,5 +1,6 @@
 "use client";
 
+import { playPen, playTick } from "@/lib/client/sfx";
 import { CheckSquare, DateStamp, Scribble } from "@/components/desk/Stamps";
 import { ApprovalBox, FORM_NO, Sheet } from "@/components/desk/Sheet";
 import { CASE_TYPES, LIMITS, type CaseType } from "@/lib/constants";
@@ -26,8 +27,14 @@ const th = "w-[4.6em] border-r border-ink/70 bg-black/[0.035] px-2 py-2 text-lef
 const hand = "w-full bg-transparent font-hand text-[23px] leading-[1.2] text-ink-blue outline-none placeholder:text-black/25";
 
 /** 사건 접수서: 서식 줄에 펜으로 써 넣는다 */
-export function IntakeForm({ input, set, today }: { input: Input; set: <K extends keyof Input>(k: K, v: Input[K]) => void; today: string }) {
+export function IntakeForm({ input, set: rawSet, today }: { input: Input; set: <K extends keyof Input>(k: K, v: Input[K]) => void; today: string }) {
   const ph = PLACEHOLDER[input.type];
+  // 칸에 쓸 때는 펜 소리, 체크칸은 체크 소리
+  const set = <K extends keyof Input>(k: K, v: Input[K]) => {
+    if (k === "type") playTick();
+    else playPen();
+    rawSet(k, v);
+  };
   return (
     <Sheet formNo={FORM_NO.intake} side="(앞쪽)" page={1} className="font-serif">
       <div className="px-5 pt-4 pb-5">

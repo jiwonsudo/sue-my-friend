@@ -13,7 +13,7 @@ import { VoteBars } from "@/components/VoteBars";
 import { Typewriter } from "@/components/Typewriter";
 import { api } from "@/lib/client/api";
 import { isMuted, setMuted } from "@/lib/client/sfx";
-import { CARD_NOTICE, CUTIN_LINES, DEFENSE_CARDS, LIMITS, type CardId } from "@/lib/constants";
+import { CUTIN_LINES, DEFENSE_CARDS, LIMITS } from "@/lib/constants";
 import { KIND_LABEL, otherRole, rebuttalTarget, ROLE_LABEL } from "@/lib/trial";
 import type { PublicEvidence, Role, StatementRow, TrialView } from "@/lib/types";
 
@@ -24,11 +24,13 @@ export function TrialClient({
   juryLink,
   juryImage,
   canSwitch,
+  notifyLinks,
 }: {
   initial: TrialView;
   juryLink: string | null;
   juryImage: string | null;
   canSwitch: boolean;
+  notifyLinks: Record<Role, string>;
 }) {
   const router = useRouter();
   const [view, setView] = useState(initial);
@@ -37,6 +39,8 @@ export function TrialClient({
   const [muted, setMutedState] = useState(false);
   const [zoom, setZoom] = useState<PublicEvidence | null>(null);
   const [showJury, setShowJury] = useState(false);
+  // 내 진술을 낸 직후에는 상대에게 알릴 공유 버튼을 펼쳐 둔다
+  const [showNotify, setShowNotify] = useState(false);
   const [jury, setJury] = useState<{ link: string; image: string } | null>(juryLink && juryImage ? { link: juryLink, image: juryImage } : null);
   const [inviting, setInviting] = useState(false);
   const [inviteError, setInviteError] = useState<string | null>(null);
@@ -55,6 +59,7 @@ export function TrialClient({
   }, [view.caseId, me, router]);
 
   const invite = async () => {
+    if (!confirm("배심원을 초대하면 공방이 끝난 뒤 6시간 동안 배심원 투표로 판결합니다. (0표면 AI 재판장) 초대는 취소할 수 없습니다. 초대합니까?")) return;
     setInviting(true);
     setInviteError(null);
     try {
@@ -97,18 +102,35 @@ export function TrialClient({
   }, [view.statements.length]);
 
   const latest = [...view.statements].reverse().find((s) => !s.forfeited);
-  const speaker: Role | "judge" = latest && view.status === "trial" ? latest.role : "judge";
   const judgeLine = useMemo(() => {
-    if (view.status === "voting") return "공방을 종결합니다. 이제 배심원의 판단을 구하겠습니다.";
+    if (view.status === "voting") return "공방을 종결합니다. 이제 배심원의 평결을 기다리겠습니다.";
     const c = view.current;
     if (!c) return "";
-    const who = `${ROLE_LABEL[c.role]} ${nick(c.role)}`;
-    if (c.kind === "testimony") return `${c.round}라운드. ${who}은(는) 증언하십시오.`;
-    if (c.kind === "rebuttal") return `${who}은(는) 상대 증언 중 한 문장을 골라 반박하십시오.`;
-    return `최후진술입니다. ${who}, 한 문장으로 말씀하십시오.`;
+    const side = `${ROLE_LABEL[c.role]} 측 ${nick(c.role)}`;
+    const forfeited = view.statements.at(-1)?.forfeited ? "직전 진술은 기한 경과로 포기 처리되었습니다. " : "";
+    if (c.kind === "testimony") return `${forfeited}${c.round}라운드를 시작합니다. ${side}, 증언하십시오.`;
+    if (c.kind === "rebuttal") return `${forfeited}${side}, 상대 증언 중 한 문장을 골라 반박하십시오.`;
+    return `${forfeited}최후진술입니다. ${side}, 한 문장으로 말씀하십시오.`;
   }, [view, nick]);
 
-  const dialogText = latest && view.status === "trial" ? latest.sentences.join(" ") : judgeLine;
+  // 마지막 진술을 먼저 읽어 주고, 다 읽으면 재판장이 다음 차례를 부른다
+  const [judgeTurn, setJudgeTurn] = useState(!latest);
+  const latestId = latest?.id;
+  const latestText = latest?.sentences.join(" ") ?? "";
+  useEffect(() => {
+    if (!latestId || view.status !== "trial") {
+      setJudgeTurn(true);
+      return;
+    }
+    setJudgeTurn(false);
+    const t = setTimeout(() => setJudgeTurn(true), [...latestText].length * 38 + 1800);
+    return () => clearTimeout(t);
+    // 진술이 새로 올라왔을 때만 (5초마다 오는 폴링 응답으로는 다시 시작하지 않음)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [latestId, view.status]);
+
+  const speaker: Role | "judge" = judgeTurn || !latest ? "judge" : latest.role;
+  const dialogText = speaker === "judge" ? judgeLine : latestText;
   const myTurn = view.status === "trial" && view.current?.role === me;
   const evidenceById = useMemo(() => new Map(view.evidence.map((e) => [e.id, e])), [view.evidence]);
 
@@ -197,12 +219,42 @@ export function TrialClient({
           {view.status === "voting" ? (
             <VotingPanel view={view} />
           ) : myTurn && view.current ? (
-            <Compose view={view} me={me} onDone={refresh} />
+            <Compose
+              view={view}
+              onDone={() => {
+                setShowNotify(true);
+                refresh();
+              }}
+            />
           ) : view.current ? (
-            <p className="py-3 text-center font-type text-[13px] text-white/70">
-              상대 {KIND_LABEL[view.current.kind]} 대기 · 남은 시간{" "}
-              <Countdown deadline={view.current.deadline} format="hm" className="font-bold text-white" />
-            </p>
+            <div className="pb-1">
+              <p className="py-2 text-center font-type text-[13px] text-white/70">
+                {nick(view.current.role)} {KIND_LABEL[view.current.kind]} 대기 · 남은 시간{" "}
+                <Countdown deadline={view.current.deadline} format="hm" className="font-bold text-white" />
+              </p>
+              <button
+                type="button"
+                onClick={() => setShowNotify((v) => !v)}
+                aria-expanded={showNotify}
+                className="min-h-12 w-full bg-paper font-serif text-[15px] font-bold text-ink shadow-[inset_0_-2px_0_rgb(0_0_0/0.15)]"
+              >
+                {nick(view.current.role)}에게 차례 알리기
+              </button>
+              {showNotify && (
+                <div className="mt-2 space-y-1.5">
+                  <p className="text-center font-type text-[11.5px] text-white/55">
+                    링크를 받은 쪽은 바로 공방 화면으로 들어옴. 기한 안에 진술하지 않으면 진술 포기로 처리됨.
+                  </p>
+                  <ShareButtons
+                    compact
+                    url={notifyLinks[view.current.role]}
+                    title={`[${view.caseNo}] ${nick(view.current.role)}님 ${KIND_LABEL[view.current.kind]} 차례입니다`}
+                    text={`${view.title} — ${ROLE_LABEL[me]} ${nick(me)}의 진술이 제출됨. 기한 6시간.`}
+                    buttonLabel="공방 입장"
+                  />
+                </div>
+              )}
+            </div>
           ) : null}
           {jury ? (
             <>
@@ -214,6 +266,9 @@ export function TrialClient({
               >
                 배심원 모집 링크 {showJury ? "닫기" : "보기"}
               </button>
+              <p className="mt-1.5 text-center font-type text-[11px] text-[#e8c77a]">
+                배심원 초대됨. 공방이 끝나면 배심원 투표(6시간)로 판결함. 0표면 AI 재판장.
+              </p>
               {showJury && (
                 <div className="mt-2">
                   <ShareButtons
@@ -232,8 +287,10 @@ export function TrialClient({
               <button type="button" disabled={inviting} onClick={invite} className="min-h-11 w-full border border-white/25 font-serif text-[14px] font-bold disabled:opacity-40">
                 배심원 초대
               </button>
-              <p className="mt-1.5 text-center font-type text-[11px] leading-relaxed text-white/45">
-                미초대 시 공방 종료 즉시 AI 재판장이 양측 진술로 판결함.
+              <p className="mt-1.5 text-center font-type text-[11px] leading-relaxed text-white/50">
+                초대 시: 공방 종료 후 배심원 투표(6시간)로 판결.
+                <br />
+                미초대 시: 공방 종료 즉시 AI 재판장이 양측 진술로 판결.
               </p>
               {inviteError && <p className="text-center text-sm text-red-300">{inviteError}</p>}
             </div>
@@ -382,48 +439,27 @@ function StatementCard({
   );
 }
 
-function Compose({ view, me, onDone }: { view: TrialView; me: Role; onDone: () => void }) {
+function Compose({ view, onDone }: { view: TrialView; onDone: () => void }) {
   const slot = view.current!;
   const [lines, setLines] = useState<string[]>([""]);
   const [targetIdx, setTargetIdx] = useState<number | null>(null);
-  const [cardId, setCardId] = useState<CardId | null>(null);
-  const [ev, setEv] = useState<PublicEvidence | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const target = slot.kind === "rebuttal" ? rebuttalTarget(view.statements, slot.round) : null;
   const needsTarget = !!target && !target.forfeited;
   const max = slot.kind === "testimony" ? 4 : 1;
   const filled = lines.map((l) => l.trim()).filter(Boolean);
-
-  const upload = async (file: File) => {
-    if (file.size > LIMITS.evidenceBytes) return setError("5MB 이하 이미지만 첨부 가능.");
-    setBusy(true);
-    setError(null);
-    try {
-      const fd = new FormData();
-      fd.append("file", file);
-      setEv(await api<PublicEvidence>(`/api/cases/${view.caseId}/evidence?as=${me}`, { method: "POST", body: fd }));
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "업로드 실패");
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const rename = async (label: string) => {
-    if (!ev || !label.trim() || label === ev.label) return;
-    try {
-      const r = await api<{ label: string }>(`/api/cases/${view.caseId}/evidence/${ev.id}?as=${me}`, { method: "PATCH", json: { label } });
-      setEv({ ...ev, label: r.label });
-    } catch {}
-  };
+  // 반박할 문장이 하나뿐이면 고를 필요 없이 그 문장
+  const chosen = targetIdx ?? (target && target.sentences.length === 1 ? 0 : null);
+  const missing =
+    needsTarget && chosen == null ? "위에서 반박할 문장을 먼저 고를 것" : filled.length === 0 ? `${slot.kind === "testimony" ? "증언" : "한 문장"}을 쓸 것` : null;
 
   const submit = async () => {
     setBusy(true);
     setError(null);
     try {
       await api(`/api/cases/${view.caseId}/statements`, {
-        json: { sentences: filled, targetSentenceIdx: targetIdx, cardId, evidenceId: ev?.id ?? null },
+        json: { sentences: filled, targetSentenceIdx: chosen },
       });
       setLines([""]);
       onDone();
@@ -448,21 +484,32 @@ function Compose({ view, me, onDone }: { view: TrialView; me: Role; onDone: () =
 
       {needsTarget && target && (
         <div>
-          <p className="mb-1.5 font-type text-[12px] text-white/60">반박할 문장 선택</p>
-          <div className="space-y-1.5">
+          <p className="mb-1.5 font-type text-[12px] text-white/60">
+            ① 반박할 문장 {target.sentences.length > 1 ? "하나를 눌러 고를 것" : "(자동 선택됨)"}
+          </p>
+          <div role="radiogroup" aria-label="반박할 문장" className="space-y-1.5">
             {target.sentences.map((t, i) => (
               <button
                 key={i}
                 type="button"
+                role="radio"
+                aria-checked={chosen === i}
                 onClick={() => setTargetIdx(i)}
-                className={`block min-h-11 w-full border px-3 py-2 text-left text-[14px] ${
-                  targetIdx === i ? "border-seal bg-seal/25" : "border-white/15 bg-white/5"
+                className={`flex min-h-11 w-full items-start gap-2.5 border px-3 py-2 text-left text-[14px] ${
+                  chosen === i ? "border-seal bg-seal/25" : "border-white/15 bg-white/5"
                 }`}
               >
+                <span
+                  aria-hidden
+                  className={`mt-1 grid h-4 w-4 shrink-0 place-items-center rounded-full border-[1.5px] ${chosen === i ? "border-seal" : "border-white/40"}`}
+                >
+                  {chosen === i && <span className="h-2 w-2 rounded-full bg-seal" />}
+                </span>
                 {t}
               </button>
             ))}
           </div>
+          <p className="mt-3 font-type text-[12px] text-white/60">② 반박 한 문장</p>
         </div>
       )}
 
@@ -482,68 +529,16 @@ function Compose({ view, me, onDone }: { view: TrialView; me: Role; onDone: () =
         </button>
       )}
 
-      {slot.kind === "rebuttal" && (
-        <>
-          <div>
-            <p className="mb-1.5 font-type text-[12px] text-white/60">항변 카드 (선택)</p>
-            <div className="no-scrollbar -mx-4 flex gap-2 overflow-x-auto px-4">
-              {DEFENSE_CARDS.map((c) => (
-                <button
-                  key={c.id}
-                  type="button"
-                  onClick={() => setCardId(cardId === c.id ? null : c.id)}
-                  className={`min-h-16 w-28 shrink-0 border p-2 text-left font-serif text-[12.5px] font-bold ${
-                    cardId === c.id ? "border-amber-300 bg-amber-300/15 text-amber-100" : "border-white/15 bg-white/5"
-                  }`}
-                >
-                  {c.name}
-                </button>
-              ))}
-            </div>
-            {cardId && (
-              <div className="mt-2 bg-amber-100 p-3 text-[12px] text-ink">
-                <p>{DEFENSE_CARDS.find((c) => c.id === cardId)!.desc}</p>
-                <p className="mt-1 text-[10px] text-black/50">{CARD_NOTICE}</p>
-              </div>
-            )}
-          </div>
-          <div className="flex items-center gap-2">
-            {ev ? (
-              <>
-                {ev.url && (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={ev.url} alt="" className="h-11 w-11 object-cover" />
-                )}
-                <input
-                  defaultValue={ev.label}
-                  maxLength={LIMITS.label}
-                  onBlur={(e) => rename(e.target.value)}
-                  className="min-h-11 flex-1 border-b border-white/30 bg-transparent px-1 font-type text-[14px]"
-                  aria-label="증거 이름"
-                />
-                <button type="button" className="min-h-11 px-2 text-xs text-white/60" onClick={() => setEv(null)}>
-                  빼기
-                </button>
-              </>
-            ) : (
-              <label className="flex min-h-11 cursor-pointer items-center border border-dashed border-white/25 px-3 font-type text-[12.5px] text-white/70">
-                증거 사진 첨부 (선택, 5MB 이하)
-                <input type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files?.[0] && upload(e.target.files[0])} />
-              </label>
-            )}
-          </div>
-        </>
-      )}
-
       {error && <p className="text-sm text-red-300">{error}</p>}
       <button
         type="button"
-        disabled={busy || filled.length === 0 || (needsTarget && targetIdx == null)}
+        disabled={busy || !!missing}
         onClick={submit}
         className="min-h-14 w-full bg-seal font-serif text-[18px] font-black tracking-[0.06em] shadow-[inset_0_-3px_0_rgb(0_0_0/0.25)] disabled:opacity-40"
       >
         {busy ? "제출 중" : slot.kind === "rebuttal" ? "이의 있음!" : `${label} 제출`}
       </button>
+      {missing && !busy && <p className="-mt-1 text-center font-type text-[12px] text-[#ffb3a8]">{missing}</p>}
     </div>
   );
 }

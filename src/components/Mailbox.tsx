@@ -1,5 +1,6 @@
 "use client";
 
+import { playFold, playMailbox, playTear } from "@/lib/client/sfx";
 import { AnimatePresence, motion, type PanInfo } from "framer-motion";
 import { useState } from "react";
 import { TriFold } from "./desk/TriFold";
@@ -13,11 +14,20 @@ type Stage = "closed" | "envelope" | "tearing" | "unfold";
 export function MailboxSequence({ fromNick, onDone }: { fromNick: string; onDone: () => void }) {
   const [stage, setStage] = useState<Stage>("closed");
 
-  const openBox = () => stage === "closed" && setStage("envelope");
+  const openBox = () => {
+    if (stage !== "closed") return;
+    playMailbox();
+    setStage("envelope");
+  };
   const tear = () => {
     if (stage !== "envelope") return;
     setStage("tearing");
-    setTimeout(() => setStage("unfold"), 900);
+    playTear();
+    setTimeout(() => {
+      setStage("unfold");
+      playFold();
+      setTimeout(playFold, 550);
+    }, 900);
     setTimeout(onDone, 900 + 1300);
   };
   const onDragEnd = (_: unknown, info: PanInfo) => {
