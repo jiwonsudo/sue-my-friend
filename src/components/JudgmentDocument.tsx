@@ -12,6 +12,8 @@ export type JudgmentDocumentProps = {
   reason: string;
   date: string;
   verdictLabel: string;
+  /** 서명란: 배심원 일동 / 재판장(AI) / 본 법정 */
+  signer?: string;
   executed?: boolean;
   compact?: boolean;
   className?: string;
@@ -23,7 +25,7 @@ export type JudgmentDocumentProps = {
 
 export function JudgmentDocument(p: JudgmentDocumentProps) {
   const verdict = p.verdictStamp ?? <RubberStamp text={p.verdictLabel} className="-rotate-6" />;
-  const executed = p.executedStamp ?? (p.executed ? <RubberStamp text="집행 완료" className="bg-paper/30 px-4 text-3xl" /> : null);
+  const executed = p.executedStamp ?? (p.executed ? <RubberStamp text="집행 완료" className="bg-paper/30 px-4 !text-3xl" /> : null);
   return (
     <Sheet
       formNo={p.compact ? undefined : FORM_NO.judgment}
@@ -55,7 +57,7 @@ export function JudgmentDocument(p: JudgmentDocumentProps) {
         <div className={`flex items-end justify-between ${p.compact ? "mt-5" : "mt-10"}`}>
           <div>
             <p className="tracking-[0.12em]">{p.date}</p>
-            <p className="mt-1 text-[0.9em] text-black/60">배심원 일동</p>
+            <p className="mt-1 text-[0.9em] text-black/60">{p.signer ?? "배심원 일동"}</p>
           </div>
           {verdict}
         </div>

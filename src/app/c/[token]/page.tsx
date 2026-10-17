@@ -26,9 +26,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 export default async function DefendantPage({ params }: Props) {
   const { token } = await params;
   const c = await caseForDefendantToken(token);
-  if (!c) return <Gate title="문서를 찾을 수 없습니다" body="링크가 올바르지 않거나 만료되었어요." />;
+  if (!c) return <Gate title="문서를 찾을 수 없습니다" body="주소 오류 또는 만료." />;
   if (c.status === "dismissed") {
-    return <Gate title="기각된 사건입니다" body="이 통고서는 피고에 의해 기각되어 더 이상 볼 수 없어요." />;
+    return <Gate title="기각된 사건입니다" body="피고가 기각한 통고서. 열람 불가." />;
   }
   return (
     <DefendantView
@@ -38,6 +38,7 @@ export default async function DefendantPage({ params }: Props) {
       status={c.status}
       responded={c.defendant_response}
       deadline={c.response_deadline_at}
+      openedAt={c.opened_at}
       doc={{
         caseNo: c.case_no,
         toNick: c.defendant_nick,

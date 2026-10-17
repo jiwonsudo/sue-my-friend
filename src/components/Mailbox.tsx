@@ -77,9 +77,9 @@ export function MailboxSequence({ fromNick, onDone }: { fromNick: string; onDone
         )}
       </AnimatePresence>
 
-      <p className="pointer-events-none absolute bottom-6 text-sm text-muted">
-        {stage === "closed" && "탭해서 열기"}
-        {stage === "envelope" && "위로 밀어서 뜯기"}
+      <p className="pointer-events-none absolute bottom-6 font-type text-[13px] text-black/50">
+        {stage === "closed" && "우편함을 눌러 열 것"}
+        {stage === "envelope" && "봉투를 위로 밀어 개봉"}
       </p>
     </div>
   );
@@ -142,7 +142,7 @@ function Envelope({ torn, fromNick }: { torn: boolean; fromNick: string }) {
         <p className="text-xs text-black/50">발신</p>
         <p className="text-sm font-bold">{fromNick}</p>
         <div className="absolute top-4 right-4 rotate-[-8deg]">
-          <RubberStamp text="내용증명" className="text-base" />
+          <RubberStamp text="통고서 재중" className="text-[13px]" />
         </div>
         <div className="mt-7 h-px w-40 bg-black/15" />
         <div className="mt-3 h-px w-28 bg-black/15" />

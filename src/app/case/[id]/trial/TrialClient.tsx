@@ -357,7 +357,7 @@ function Compose({ view, me, onDone }: { view: TrialView; me: Role; onDone: () =
   const filled = lines.map((l) => l.trim()).filter(Boolean);
 
   const upload = async (file: File) => {
-    if (file.size > LIMITS.evidenceBytes) return setError("5MB 이하 이미지만 올릴 수 있어요.");
+    if (file.size > LIMITS.evidenceBytes) return setError("5MB 이하 이미지만 첨부 가능.");
     setBusy(true);
     setError(null);
     try {

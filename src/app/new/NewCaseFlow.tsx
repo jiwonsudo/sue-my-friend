@@ -55,7 +55,7 @@ export function NewCaseFlow({ initial, resume }: { initial: Pick<Input, "type" |
     try {
       return await fn();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "잠시 후 다시 시도해주세요.");
+      setError(e instanceof Error ? e.message : "일시 오류. 잠시 후 다시 시도할 것.");
     } finally {
       setBusy(null);
     }

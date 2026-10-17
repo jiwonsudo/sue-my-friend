@@ -23,7 +23,7 @@ export default async function TrialPage({
   if (!c) notFound();
   const roles = await rolesForCase(c.id);
   if (roles.length === 0) {
-    return <Gate title="공방 당사자만 입장할 수 있습니다" body="배심원이라면 공유받은 배심원 링크로 들어와 주세요." />;
+    return <Gate title="공방 당사자만 입장할 수 있습니다" body="배심원은 공유받은 배심원 링크로 접속할 것." />;
   }
   if (c.status === "judged" || c.status === "executed") redirect(`/v/${c.id}`);
   if (!["trial", "voting"].includes(c.status)) redirect(roles.includes("plaintiff") ? `/case/${c.id}` : "/");

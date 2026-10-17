@@ -123,12 +123,14 @@ export default async function CaseDashboard({ params }: { params: Promise<{ id: 
                 ]}
               />
               {c.opened_at && (
-                <DateStamp
-                  label="열람"
-                  date={formatTime(c.opened_at)}
-                  foot={formatDate(c.opened_at).replaceAll(" ", "")}
-                  className="stamp-ink absolute right-6 bottom-3 rotate-[-7deg]"
-                />
+                <div className="-mb-2 flex justify-end pt-3 pr-3">
+                  <DateStamp
+                    label="열람"
+                    date={formatTime(c.opened_at)}
+                    foot={formatDate(c.opened_at).replaceAll(" ", "")}
+                    className="stamp-ink rotate-[-7deg]"
+                  />
+                </div>
               )}
               {c.status === "dismissed" && (
                 <div className="mt-5 flex items-start gap-3">

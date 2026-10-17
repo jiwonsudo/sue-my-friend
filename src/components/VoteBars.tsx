@@ -26,19 +26,19 @@ export function VoteBars({
         const pct = total ? Math.round((votes[r.k] / total) * 100) : 0;
         return (
           <div key={r.k}>
-            <div className="mb-0.5 flex justify-between text-xs">
+            <div className="mb-0.5 flex justify-between font-type text-[12px]">
               <span>{r.label}</span>
               <span className="tabular-nums">
                 {votes[r.k]}표 · {pct}%
               </span>
             </div>
-            <div className={`h-2 overflow-hidden rounded-full ${light ? "bg-black/10" : "bg-white/10"}`}>
+            <div className={`h-2 overflow-hidden ${light ? "bg-black/10" : "bg-white/10"}`}>
               <motion.div className="h-full bg-seal" initial={{ width: 0 }} animate={{ width: `${pct}%` }} />
             </div>
           </div>
         );
       })}
-      <p className={`text-right text-[11px] ${light ? "text-muted" : "text-white/40"}`}>총 {total}명 참여</p>
+      <p className={`text-right font-type text-[11px] ${light ? "text-muted" : "text-white/40"}`}>참여 {total}명</p>
     </div>
   );
 }
