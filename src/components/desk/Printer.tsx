@@ -1,5 +1,6 @@
 "use client";
 
+import { playPaperFeed, playPrintLine } from "@/lib/client/sfx";
 import { motion, useReducedMotion } from "framer-motion";
 import { useEffect, useState } from "react";
 
@@ -32,6 +33,22 @@ export function Printer({ head, label = "작성 중" }: { head: string[]; label?
     }, n >= total ? 700 : 32);
     return () => clearTimeout(t);
   }, [n, total, head, reduce]);
+
+  // 줄이 바뀔 때마다 도트 프린터 소리
+  const lineNo = (() => {
+    let k = reduce ? total : n;
+    for (let i = 0; i < lines.length; i++) {
+      k -= [...lines[i]].length;
+      if (k < 0) return i;
+    }
+    return lines.length;
+  })();
+  useEffect(() => {
+    if (!reduce) playPrintLine();
+  }, [lineNo, round, reduce]);
+  useEffect(() => {
+    if (!reduce) playPaperFeed();
+  }, [reduce]);
 
   let left = reduce ? total : n;
   const shown = lines.map((l) => {

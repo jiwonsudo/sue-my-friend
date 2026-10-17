@@ -1,5 +1,6 @@
 "use client";
 
+import { playPen } from "@/lib/client/sfx";
 import { useLayoutEffect, useRef } from "react";
 import { LIMITS } from "@/lib/constants";
 import type { Draft } from "@/lib/types";
@@ -128,7 +129,10 @@ function Correctable({
         rows={1}
         maxLength={max}
         value={value}
-        onChange={(e) => onChange(e.target.value)}
+        onChange={(e) => {
+          playPen();
+          onChange(e.target.value);
+        }}
         className={`block w-full resize-none overflow-hidden bg-transparent outline-none ${
           changed
             ? "-rotate-[0.4deg] font-hand text-[22px] leading-[1.25] text-redpen"

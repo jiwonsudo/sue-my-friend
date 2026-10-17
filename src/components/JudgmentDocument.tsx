@@ -12,20 +12,17 @@ export type JudgmentDocumentProps = {
   reason: string;
   date: string;
   verdictLabel: string;
-  /** 서명란: 배심원 일동 / 재판장(AI) / 본 법정 */
+  /** 서명란: 재판장 (AI) / 본 법정 */
   signer?: string;
-  executed?: boolean;
   compact?: boolean;
   className?: string;
   style?: React.CSSProperties;
   /** 판결 도장 자리를 연출용으로 바꿔 끼울 때 */
   verdictStamp?: React.ReactNode;
-  executedStamp?: React.ReactNode;
 };
 
 export function JudgmentDocument(p: JudgmentDocumentProps) {
   const verdict = p.verdictStamp ?? <RubberStamp text={p.verdictLabel} className="-rotate-6" />;
-  const executed = p.executedStamp ?? (p.executed ? <RubberStamp text="집행 완료" className="bg-paper/30 px-4 !text-3xl" /> : null);
   return (
     <Sheet
       formNo={p.compact ? undefined : FORM_NO.judgment}
@@ -35,7 +32,7 @@ export function JudgmentDocument(p: JudgmentDocumentProps) {
       style={p.style}
     >
       <div className={p.compact ? "px-5 pt-5 pb-5" : "px-6 pt-5 pb-5 sm:px-9"}>
-        <p className="font-type text-[11px] tracking-[0.25em] text-black/50">{SERVICE_NAME} 배심 법정</p>
+        <p className="font-type text-[11px] tracking-[0.25em] text-black/50">{SERVICE_NAME} 간이 법정</p>
         <h1 className={`mt-2 leading-none font-black tracking-[0.9em] ${p.compact ? "text-[22px]" : "text-[28px]"}`}>판결</h1>
         <div className="mt-2.5 mb-5 h-[5px] w-[7.5rem] border-y border-ink" />
         <FormTable
@@ -57,11 +54,10 @@ export function JudgmentDocument(p: JudgmentDocumentProps) {
         <div className={`flex items-end justify-between ${p.compact ? "mt-5" : "mt-10"}`}>
           <div>
             <p className="tracking-[0.12em]">{p.date}</p>
-            <p className="mt-1 text-[0.9em] text-black/60">{p.signer ?? "배심원 일동"}</p>
+            <p className="mt-1 text-[0.9em] text-black/60">{p.signer ?? "재판장 (AI)"}</p>
           </div>
           {verdict}
         </div>
-        {executed && <div className="pointer-events-none absolute bottom-[38%] left-5 -rotate-12">{executed}</div>}
         <hr className={`mb-3 border-paper-line ${p.compact ? "mt-5" : "mt-8"}`} />
         <Disclaimer className={p.compact ? "text-[10px]" : ""} />
       </div>

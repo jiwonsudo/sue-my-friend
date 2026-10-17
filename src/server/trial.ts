@@ -2,7 +2,8 @@ import "server-only";
 import { TURN_WINDOW_MS } from "@/lib/constants";
 import { currentSlot } from "@/lib/trial";
 import type { CaseRow, EvidenceRow, PublicEvidence, Role, TrialView } from "@/lib/types";
-import { fetchStatements, tallyVotes } from "./cases";
+import { fetchStatements } from "./cases";
+import { fetchLawyerUse } from "./lawyer";
 import { db, signedUrl } from "./supabase";
 
 export async function fetchEvidence(caseId: string): Promise<EvidenceRow[]> {
@@ -15,11 +16,7 @@ export async function fetchEvidence(caseId: string): Promise<EvidenceRow[]> {
 }
 
 export async function buildTrialView(c: CaseRow, me: Role | null): Promise<TrialView> {
-  const [statements, evidenceRows, votes] = await Promise.all([
-    fetchStatements(c.id),
-    fetchEvidence(c.id),
-    tallyVotes(c.id),
-  ]);
+  const [statements, evidenceRows] = await Promise.all([fetchStatements(c.id), fetchEvidence(c.id)]);
   const evidence: PublicEvidence[] = await Promise.all(
     evidenceRows.map(async (e) => ({
       id: e.id,
@@ -29,6 +26,7 @@ export async function buildTrialView(c: CaseRow, me: Role | null): Promise<Trial
     })),
   );
   const slot = c.status === "trial" ? currentSlot(statements) : null;
+  const lawyerUse = slot && me && slot.kind === "rebuttal" && slot.role === me ? await fetchLawyerUse(c.id, me, slot.round) : null;
   const last = statements.at(-1)?.created_at ?? c.trial_started_at ?? c.created_at;
   return {
     caseId: c.id,
@@ -40,9 +38,10 @@ export async function buildTrialView(c: CaseRow, me: Role | null): Promise<Trial
     me,
     statements,
     evidence,
+    lawyer:
+      slot && me && slot.kind === "rebuttal" && slot.role === me
+        ? { used: !!lawyerUse?.granted_at, suggestions: lawyerUse?.suggestions ?? null }
+        : null,
     current: slot ? { ...slot, deadline: new Date(new Date(last).getTime() + TURN_WINDOW_MS).toISOString() } : null,
-    votingDeadline: c.voting_deadline_at,
-    juryInvited: !!c.jury_invited_at,
-    votes,
   };
 }

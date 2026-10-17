@@ -1,6 +1,6 @@
 # 내 친구 고소하기
 
-치킨 내기, 읽씹, 노쇼, 빌린 돈 같은 사소한 원한을 아주 진지한 통고서로 보내고, 상대가 버티면 3라운드 공방 → 배심원 투표 → 판결까지 가는 장난 웹 서비스.
+치킨 내기, 읽씹, 노쇼, 빌린 돈 같은 사소한 원한을 아주 진지한 통고서로 보내고, 상대가 버티면 3라운드 공방 → AI 재판장 판결까지 가는 장난 웹 서비스.
 
 > 형식은 끝까지 진지한 법률 문서, 내용은 끝까지 하찮게.
 
@@ -41,11 +41,17 @@ pnpm exec supabase start -x studio,imgproxy,edge-runtime,logflare,vector,supavis
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | ✓ | anon 키. RLS로 모든 테이블이 막혀 있어 실제로는 쓰이지 않지만 표준 설정으로 둠 |
 | `SUPABASE_SERVICE_ROLE_KEY` | ✓ | 서버 전용. 모든 DB·Storage 접근은 이 키로 Route Handler에서만 |
 | `ANTHROPIC_API_KEY` | ✓(배포) | 초안 생성용 |
-| `ANTHROPIC_MODEL` | ✓ | 예: `claude-opus-5-5` |
+| `ANTHROPIC_MODEL` | ✓ | 기본 `claude-sonnet-5-5` (사건당 200원 상한 기준). Opus 는 200원 안에서 재생성 횟수가 줄어듦 |
+| `AI_BUDGET_KRW_PER_CASE` | | 사건 1건당 AI 비용 상한(원). 기본 200 |
+| `KRW_PER_USD` | | 상한 계산용 환율. 기본 1400 |
+| `NEXT_PUBLIC_GAM_REWARDED_UNIT` | | Google Ad Manager 보상형 광고 단위. 비우면 배포에서 변호인 기능 숨김 |
+| `ADS_TXT` | | `/ads.txt` 내용 (Ad Manager 판매자 확인) |
+| `NEXT_PUBLIC_AD_MOCK` | | `1`이면 배포에서도 가짜 광고 (테스트용) |
+| `AI_LAWYER_BUDGET_KRW` | | AI 변호인 1회 비용 상한(원). 기본 40 |
 | `NEXT_PUBLIC_KAKAO_JS_KEY` | | 카카오 JS 키. 없으면 [카톡으로 보내기]가 Web Share → 링크 복사로 대체 |
 | `NEXT_PUBLIC_SITE_URL` | ✓ | 예: `https://sue-my-friend.vercel.app` (링크·OG 이미지 절대 경로, Origin 검사에 사용) |
 | `PROMPT_CANARY` | ✓ | 시스템 프롬프트 끝에 붙는 랜덤 문자열. 출력에 나오면 유출로 보고 폐기 |
-| `TOKEN_SECRET` | ✓ | 32자 이상 랜덤 (`openssl rand -hex 32`). 피고·배심원 링크 토큰 파생용 |
+| `TOKEN_SECRET` | ✓ | 32자 이상 랜덤 (`openssl rand -hex 32`). 피고 링크 토큰 파생용 |
 
 ## Supabase 설정 순서 (클라우드)
 
@@ -78,7 +84,7 @@ src/
     case/[id]/                원고 현황판 (원고 쿠키 필요)
     case/[id]/trial/          공방 (원고/피고 쿠키)
     c/[token]/                피고 수신 (우편함 연출)
-    j/[token]/                배심원 투표
+    t/[token]/                차례 알림 링크 → 쿠키 발급 후 공방으로
     v/[caseId]/               판결문 (공개)
     enter/[token]/            "내 사건 링크" → 쿠키 발급 후 이동
     api/...                   모든 쓰기·읽기 (service role)
@@ -96,11 +102,11 @@ supabase/migrations/          DB 스키마 (RLS 전면 차단)
 
 - 로그인 없음. 역할별 링크 토큰(32바이트, base64url)으로 들어오고, DB에는 SHA-256 해시만 저장.
   - 원고: 사건 생성 시 랜덤 토큰 발급 → httpOnly 쿠키 + "내 사건 링크"(`/enter/<token>`)
-  - 피고·배심원: `HMAC(TOKEN_SECRET, 사건id:역할:사건별 salt)`로 파생. 원고가 현황판에서 발송 링크를 다시 볼 수 있어야 해서 원문을 저장하지 않고 파생하는 방식을 택함.
+  - 피고: `HMAC(TOKEN_SECRET, 사건id:역할:사건별 salt)`로 파생. 원고가 현황판에서 발송 링크를 다시 볼 수 있어야 해서 원문을 저장하지 않고 파생하는 방식을 택함.
   - 피고는 `/c/<token>`을 열 때 피고 쿠키가 발급되어 이후 공방 화면에 들어갈 수 있음.
 - 모든 테이블 RLS ON + 정책 없음 + anon/authenticated 권한 회수. 읽기·쓰기는 Route Handler에서 service role로, 서버가 쿠키 토큰과 역할을 검증.
 - 모든 POST/PATCH는 `Origin` 헤더가 같은 출처일 때만 허용.
-- 증거·집행 인증 이미지는 비공개 버킷, 화면에는 1시간 서명 URL로만.
+- 증거 이미지는 비공개 버킷, 화면에는 1시간 서명 URL로만. (집행 인증 기능은 없앰. `judgments.execution_proof_path`·`executed_at` 칸은 쓰지 않음)
 
 ### 기한 처리 (크론 없음)
 
@@ -108,23 +114,38 @@ supabase/migrations/          DB 스키마 (RLS 전면 차단)
 
 - 답변 기한(12h) 경과 → `defendant_response = ignore`, 궐석 판결
 - 공방 턴(6h) 경과 → 해당 턴을 "진술 포기"로 기록하고 다음 턴으로 (여러 턴이 지났으면 연속 처리)
-- 공방 종료 → 배심원을 초대했으면 투표(6h), 초대하지 않았으면 AI 재판장이 바로 판결
-- 투표 마감(6h) 경과 → 최다 득표 판결, 동률이면 쌍방 과실, 0표면 AI 재판장 판결
+- 공방 종료(6턴 모두 진술 또는 진술 포기) → AI 재판장이 바로 판결
 
-### 배심원 초대와 AI 재판장
+### 사건당 AI 비용 상한
 
-- 배심원 링크는 공방 중에 당사자가 [배심원 초대]를 눌러야 열린다 (`cases.jury_invited_at`). 그 전에는 배심원 페이지와 투표가 막혀 있다.
+- 초안·재생성·AI 재판장을 합쳐 사건 1건에 `AI_BUDGET_KRW_PER_CASE`(기본 200원)를 넘지 않게 호출한다 (`src/server/aiBudget.ts`).
+- 사용액은 `cases.ai_cost_usd`에 실제 청구 토큰(`usage`) 기준으로 누적한다.
+- 호출 전에 남은 예산에서 입력 비용(글자 수 × 1.5 토큰으로 넉넉히 추정)을 빼고, 남는 만큼만 `max_tokens`로 준다. 출력은 `max_tokens`를 넘지 않으므로 호출 1번이 상한을 넘을 수 없다.
+- 초안은 AI 재판장 몫(입력 8천 + 출력 3천 토큰)을 남겨 두고 쓴다. 남은 예산으로 초안이 잘릴 정도면 재생성을 거절한다("AI 사용 한도에 도달").
+- AI 재판장도 남은 예산이 모자라면 부르지 않고 규칙 기반으로 판결한다.
+- 생각(thinking) 토큰도 출력 요금이라 두 호출 모두 `effort: "low"`.
+
+### 광고 보상형 AI 변호인
+
+- 내 반박 차례(1·2라운드)마다 1번, [광고 보고 변호인 선임] → 보상형 광고 시청 → AI 변호인이 법 조항을 인용한 이의 2~3개를 추천 → 하나 골라 제출.
+- 인용 조항은 `src/lib/laws.ts`의 실존 조항 목록(요지)에서만 고른다. 목록 밖 조항은 버리고, 키가 없거나 실패하면 정해진 문장으로 추천.
+- 광고 확인: 광고를 띄우기 직전 서버가 일회용 티켓을 발급하고(`lawyer_uses`), 발급 후 5초가 지나야 선임된다. 웹 보상형 광고(GPT)는 서버 측 보상 검증이 없어서 이 정도가 한계다.
+- 보여 줄 광고가 없으면(no fill, 데스크톱 등) 그 차례는 무료로 선임해 준다.
+- 변호인이 인용한 진술은 AI 재판장에게 가산점(프롬프트), 규칙 기반 판결에서는 1건당 +0.5점.
+- 비용: 1회 `AI_LAWYER_BUDGET_KRW`(기본 40원) 상한, 사건당 200원과 별도.
+- Google Ad Manager 설정: 계정 → 사이트 등록·승인 → 보상형(Rewarded) 광고 단위 생성 → `NEXT_PUBLIC_GAM_REWARDED_UNIT`, `ADS_TXT` 환경변수. 보상형 웹 광고는 모바일 화면에서만 나온다.
+
+### AI 재판장
+
 - AI 재판장은 청구와 양측이 제출한 진술(증언·반박·최후진술, 항변 카드, 진술 포기)만으로 판결한다. 시스템 프롬프트는 `src/server/prompts/judge.ts`.
 - `ANTHROPIC_API_KEY`가 없거나 호출이 실패·거절되면 정해진 규칙으로 판결한다: 진술을 포기한 턴이 적은 쪽이 이기고, 같으면 쌍방 과실.
-- `judgments.judged_by`: `system`(인낙·궐석), `jury`(배심원 평결), `judge`(AI 재판장)
+- `judgments.judged_by`: `system`(인낙·궐석), `judge`(AI 재판장). 배심원 제도는 없앴고 `votes` 테이블·`jury_invited_at`·`voting_deadline_at` 칸은 쓰지 않음 (예전 데이터 호환용으로 남겨 둠)
 
 ### 테스트할 때 마감 당기기
 
 ```sql
 -- 답변 기한 → 궐석 판결
 update cases set response_deadline_at = now() - interval '1 minute' where case_no = '2026킹-0001';
--- 투표 마감 → 판결
-update cases set voting_deadline_at = now() - interval '1 minute' where case_no = '2026킹-0001';
 -- 공방 턴 만료 → 진술 포기 (시작 시각을 과거로)
 update cases set trial_started_at = now() - interval '2 days' where case_no = '2026킹-0001';
 ```

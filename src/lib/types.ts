@@ -1,3 +1,4 @@
+import type { LawyerSuggestion } from "./laws";
 import type { CardId, CaseType } from "./constants";
 
 export type Role = "plaintiff" | "defendant";
@@ -40,6 +41,8 @@ export type CaseRow = {
   jury_invited_at: string | null;
   defendant_response: "accept" | "object" | "countersue" | "ignore" | null;
   regen_count: number;
+  /** 이 사건에 쓴 AI 비용 (USD, numeric 이라 문자열로 올 수 있음) */
+  ai_cost_usd: number | string;
   token_salt: string;
   created_at: string;
 };
@@ -57,6 +60,9 @@ export type StatementRow = {
   target_sentence_idx: number | null;
   card_id: CardId | null;
   evidence_id: string | null;
+  /** 변호인이 인용한 조항 (src/lib/laws.ts id) */
+  law_id: string | null;
+  lawyer_use_id: string | null;
   forfeited: boolean;
   created_at: string;
 };
@@ -99,7 +105,6 @@ export type TrialView = {
   statements: StatementRow[];
   evidence: PublicEvidence[];
   current: (TrialSlot & { deadline: string }) | null;
-  votingDeadline: string | null;
-  juryInvited: boolean;
-  votes: { plaintiff: number; defendant: number; both: number };
+  /** 내 반박 차례일 때만: 이번 차례 변호인 선임 여부와 추천 */
+  lawyer: { used: boolean; suggestions: LawyerSuggestion[] | null } | null;
 };

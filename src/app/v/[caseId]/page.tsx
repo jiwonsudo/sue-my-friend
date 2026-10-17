@@ -4,7 +4,6 @@ import { formatDate, loserOf, VERDICT_LABEL } from "@/lib/document";
 import { otherRole } from "@/lib/trial";
 import { rolesForCase } from "@/server/auth";
 import { fetchJudgment, loadCase } from "@/server/cases";
-import { signedUrl } from "@/server/supabase";
 import { JudgmentView } from "./JudgmentView";
 
 export const dynamic = "force-dynamic";
@@ -30,7 +29,7 @@ export default async function VerdictPage({ params }: Props) {
   const c = await loadCase(caseId);
   if (!c) return <Gate title="사건을 찾을 수 없습니다" body="주소를 다시 확인할 것." />;
   const j = await fetchJudgment(c.id);
-  if (!j) return <Gate title="아직 판결 전입니다" body="공방(과 배심원 평결)이 끝나면 선고됨." />;
+  if (!j) return <Gate title="아직 판결 전입니다" body="3라운드 공방이 끝나면 AI 재판장이 바로 선고함." />;
 
   const roles = await rolesForCase(c.id);
   const loser = loserOf(j.verdict);
@@ -41,9 +40,6 @@ export default async function VerdictPage({ params }: Props) {
       caseId={c.id}
       me={me}
       loser={loser}
-      executed={!!j.executed_at}
-      proofUrl={me ? await signedUrl(j.execution_proof_path) : null}
-      hasProof={!!j.execution_proof_path}
       counterHref={`/new?type=custom&me=${encodeURIComponent(loser === "plaintiff" ? c.plaintiff_nick : c.defendant_nick)}&them=${encodeURIComponent(loser === "plaintiff" ? c.defendant_nick : c.plaintiff_nick)}`}
       doc={{
         caseNo: c.case_no,

@@ -1,5 +1,6 @@
 "use client";
 
+import { playStamp } from "@/lib/client/sfx";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -8,6 +9,7 @@ import { Countdown } from "@/components/Countdown";
 import { BrandLabel, Desk } from "@/components/desk/Desk";
 import { DropIn, StampIn } from "@/components/desk/motion";
 import { PostIt } from "@/components/desk/PostIt";
+import { SoundToggle } from "@/components/desk/SoundToggle";
 import { Scissors } from "@/components/desk/props";
 import { FORM_NO } from "@/components/desk/Sheet";
 import { CheckSquare, DateStamp } from "@/components/desk/Stamps";
@@ -53,6 +55,7 @@ export function DefendantView({ token, caseId, firstOpen, status, responded, dea
     setPhase("doc");
     setTimeout(() => {
       setStampIn(true);
+      playStamp();
       navigator.vibrate?.(60);
       setTimeout(() => {
         setToast("열람 시각 기록됨");
@@ -124,9 +127,12 @@ export function DefendantView({ token, caseId, firstOpen, status, responded, dea
       <div className="min-h-dvh bg-[#e9e1d1]">
         <div className="flex h-12 items-center justify-between px-4">
           <BrandLabel />
-          <button type="button" className="min-h-11 px-2 font-type text-[13px] text-black/50" onClick={finishIntro}>
-            건너뛰기
-          </button>
+          <span className="flex items-center">
+            <SoundToggle dark />
+            <button type="button" className="min-h-11 px-2 font-type text-[13px] text-black/50" onClick={finishIntro}>
+              건너뛰기
+            </button>
+          </span>
         </div>
         <MailboxSequence fromNick={doc.fromNick} onDone={finishIntro} />
       </div>

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { SERVICE_NAME } from "@/lib/constants";
 import { DeskTray } from "./DeskTray";
+import { SoundToggle } from "./SoundToggle";
 import { CoffeeRing, FolderStack, FountainPen, InkPad, PaperClip, RedPen, StampStick } from "./props";
 
 export type DeskScene = "intake" | "folder" | "defendant" | "judgment" | "plain";
@@ -27,7 +28,7 @@ export function Desk({
       <DeskSurface scene={scene} />
       <div className="relative z-10 mx-auto flex h-14 max-w-[480px] items-center justify-between px-4">
         <BrandLabel />
-        {right}
+        {right ?? <SoundToggle />}
       </div>
       <main className="relative z-10 mx-auto w-full max-w-[480px] px-5 pb-[calc(var(--tray-h,0px)+40px)]">{children}</main>
       {tray && <DeskTray>{tray}</DeskTray>}

@@ -2,46 +2,29 @@
 
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Desk } from "@/components/desk/Desk";
 import { DropIn, StampIn } from "@/components/desk/motion";
-import { PaperClip } from "@/components/desk/props";
-import { FORM_NO, Sheet } from "@/components/desk/Sheet";
 import { btn } from "@/components/desk/ui";
 import { JudgmentDocument, type JudgmentDocumentProps } from "@/components/JudgmentDocument";
 import { RubberStamp } from "@/components/Seal";
-import { api } from "@/lib/client/api";
-import { playGavel } from "@/lib/client/sfx";
-import { LIMITS } from "@/lib/constants";
+import { playGavel, playStamp } from "@/lib/client/sfx";
 import type { Role } from "@/lib/types";
 
 type Props = {
   caseId: string;
   me: Role | null;
   loser: Role;
-  executed: boolean;
-  hasProof: boolean;
-  proofUrl: string | null;
   counterHref: string;
-  doc: Omit<JudgmentDocumentProps, "executed" | "compact" | "className">;
+  doc: Omit<JudgmentDocumentProps, "compact" | "className">;
 };
 
-export function JudgmentView({ caseId, me, loser, executed, hasProof, proofUrl, counterHref, doc }: Props) {
-  const router = useRouter();
+export function JudgmentView({ caseId, me, loser, counterHref, doc }: Props) {
   const reduce = useReducedMotion();
   const [phase, setPhase] = useState<"gavel" | "doc">(reduce ? "doc" : "gavel");
   const [stamped, setStamped] = useState(!!reduce);
   const [busy, setBusy] = useState(false);
-  const [msg, setMsg] = useState<string | null>(null);
   const [guide, setGuide] = useState(false);
-  // 집행 확인 직후(새로고침으로 executed 가 바뀌면) 판결문 위에 도장을 새로 찍는다
-  const [execShown, setExecShown] = useState(executed);
-  useEffect(() => {
-    if (!executed || execShown) return;
-    const t = setTimeout(() => setExecShown(true), 200);
-    return () => clearTimeout(t);
-  }, [executed, execShown]);
 
   useEffect(() => {
     if (phase !== "gavel") return;
@@ -58,6 +41,7 @@ export function JudgmentView({ caseId, me, loser, executed, hasProof, proofUrl, 
     if (phase !== "doc" || stamped) return;
     const t = setTimeout(() => {
       setStamped(true);
+      playStamp({ ink: true });
       navigator.vibrate?.(50);
     }, 650);
     return () => clearTimeout(t);
@@ -78,35 +62,6 @@ export function JudgmentView({ caseId, me, loser, executed, hasProof, proofUrl, 
         a.click();
         setTimeout(() => URL.revokeObjectURL(a.href), 2000);
       }
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const uploadProof = async (file: File) => {
-    if (file.size > LIMITS.evidenceBytes) return setMsg("5MB 이하 이미지만 첨부 가능.");
-    setBusy(true);
-    setMsg(null);
-    try {
-      const fd = new FormData();
-      fd.append("file", file);
-      await api(`/api/cases/${caseId}/execution`, { method: "POST", body: fd });
-      router.refresh();
-      setMsg("인증 사진 첨부됨. 상대방 확인 시 집행 완료.");
-    } catch (e) {
-      setMsg(e instanceof Error ? e.message : "업로드 실패");
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const confirmExecution = async () => {
-    setBusy(true);
-    try {
-      await api(`/api/cases/${caseId}/execution/confirm`, { json: {} });
-      router.refresh();
-    } catch (e) {
-      setMsg(e instanceof Error ? e.message : "오류");
     } finally {
       setBusy(false);
     }
@@ -160,60 +115,15 @@ export function JudgmentView({ caseId, me, loser, executed, hasProof, proofUrl, 
       <DropIn enter={reduce ? "fade" : "drop"}>
         <JudgmentDocument
           {...doc}
-          executed={executed}
           className="rotate-[-0.5deg]"
           verdictStamp={
             <StampIn show={stamped} rotate={-6}>
               <RubberStamp text={doc.verdictLabel} />
             </StampIn>
           }
-          executedStamp={
-            executed ? (
-              <StampIn show={stamped && execShown} delay={0.35} rotate={0}>
-                <RubberStamp text="집행 완료" className="bg-paper/30 px-4 !text-3xl" />
-              </StampIn>
-            ) : null
-          }
         />
       </DropIn>
 
-      {me && !executed && (
-        <div className="relative mt-6">
-          <PaperClip className="absolute -top-5 left-10 z-10 h-16 w-6 -rotate-6" />
-          <Sheet formNo={FORM_NO.execution} side="집행 인증" tone="cream" className="rotate-[0.8deg] font-serif">
-            <div className="px-5 pt-3 pb-5">
-              <h2 className="mb-2 text-[17px] font-black tracking-[0.3em]">집행인증서</h2>
-              {me === loser ? (
-                <>
-                  <p className="mb-3 text-[13.5px] text-black/70">이행 후 인증 사진 첨부. 상대방이 확인하면 판결문에 &lsquo;집행 완료&rsquo; 도장이 찍힘.</p>
-                  {proofUrl && (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={proofUrl} alt="집행 인증" className="mb-3 max-h-60 border-4 border-white object-contain shadow" />
-                  )}
-                  <label className={`${btn.seal} w-full cursor-pointer`}>
-                    {hasProof ? "인증 사진 다시 첨부" : "인증 사진 첨부"}
-                    <input type="file" accept="image/*" className="hidden" disabled={busy} onChange={(e) => e.target.files?.[0] && uploadProof(e.target.files[0])} />
-                  </label>
-                </>
-              ) : hasProof ? (
-                <>
-                  <p className="mb-3 text-[13.5px] text-black/70">상대방이 집행 인증 사진을 첨부함.</p>
-                  {proofUrl && (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={proofUrl} alt="집행 인증" className="mb-3 max-h-60 border-4 border-white object-contain shadow" />
-                  )}
-                  <button type="button" disabled={busy} onClick={confirmExecution} className={`${btn.seal} w-full`}>
-                    확인 (집행 완료)
-                  </button>
-                </>
-              ) : (
-                <p className="text-[13.5px] text-black/60">상대방의 집행 인증 대기 중.</p>
-              )}
-              {msg && <p className="mt-2 font-type text-[12.5px] text-seal">{msg}</p>}
-            </div>
-          </Sheet>
-        </div>
-      )}
     </Desk>
   );
 }

@@ -7,7 +7,6 @@ export const FORM_NO = {
   reply: "친고 서식 제2-1호",
   docket: "친고 서식 제5호",
   judgment: "친고 서식 제9호",
-  execution: "친고 서식 제9-1호",
   returned: "친고 서식 제0호",
 } as const;
 

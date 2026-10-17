@@ -3,12 +3,17 @@ import Anthropic from "@anthropic-ai/sdk";
 import { DEFENSE_CARDS } from "@/lib/constants";
 import { KIND_LABEL, ROLE_LABEL } from "@/lib/trial";
 import type { CaseRow, StatementRow, Verdict } from "@/lib/types";
+import { addCaseCost, caseBudgetUsd, costOf, estimateInputTokens, JUDGE_MAX_OUTPUT, maxOutputTokens, model } from "./aiBudget";
+import { lawLabel } from "@/lib/laws";
+import { lawOf } from "./lawyer";
 import { sanitize } from "./llm";
 import { JUDGE_SYSTEM_PROMPT } from "./prompts/judge";
 
 type Ruling = { verdict: Extract<Verdict, "plaintiff" | "defendant" | "both">; reason: string };
 
 const REASON_MAX = 300;
+/** 판결 JSON 한 줄을 쓰려면 이 정도는 필요하다. 남은 예산이 이보다 적으면 규칙 기반으로 판결 */
+const JUDGE_MIN_OUTPUT = 600;
 
 let client: Anthropic | null = null;
 const anthropic = () => (client ??= new Anthropic());
@@ -20,7 +25,8 @@ function transcript(c: CaseRow, statements: StatementRow[]): string {
     const target = s.target_statement_id ? statements.find((x) => x.id === s.target_statement_id) : null;
     const quoted = target && s.target_sentence_idx != null ? ` 반박 대상: 「${sanitize(target.sentences[s.target_sentence_idx] ?? "", 200)}」` : "";
     const card = DEFENSE_CARDS.find((d) => d.id === s.card_id);
-    return `${head}${quoted} ${s.sentences.map((t) => sanitize(t, 200)).join(" ")}${card ? ` (항변 카드: ${card.name})` : ""}${s.evidence_id ? " (증거 사진 제출)" : ""}`;
+    const law = lawOf(s.law_id);
+    return `${head}${quoted} ${s.sentences.map((t) => sanitize(t, 200)).join(" ")}${card ? ` (항변 카드: ${card.name})` : ""}${s.evidence_id ? " (증거 사진 제출)" : ""}${law ? ` (선임 변호인이 ${lawLabel(law)} 인용)` : ""}`;
   });
   return `<user_input>
 원고: ${sanitize(c.plaintiff_nick, 20)}
@@ -52,9 +58,12 @@ function leaked(text: string): boolean {
   return text.includes("user_input") || text.includes("시스템 프롬프트") || text.includes(JUDGE_SYSTEM_PROMPT.slice(0, 30));
 }
 
-/** 키가 없거나 호출이 실패했을 때: 진술을 포기한 턴이 적은 쪽이 이긴다. 같으면 쌍방 과실. */
+/**
+ * 키가 없거나 호출이 실패했을 때: 진술한 턴 수 + 변호인 인용 1건당 0.5점. 높은 쪽이 이기고 같으면 쌍방 과실.
+ */
 export function ruleBasedRuling(statements: StatementRow[]): Ruling {
-  const spoke = (r: "plaintiff" | "defendant") => statements.filter((s) => s.role === r && !s.forfeited).length;
+  const spoke = (r: "plaintiff" | "defendant") =>
+    statements.filter((s) => s.role === r && !s.forfeited).length + statements.filter((s) => s.role === r && s.law_id).length * 0.5;
   const p = spoke("plaintiff");
   const d = spoke("defendant");
   if (p === d) {
@@ -66,21 +75,31 @@ export function ruleBasedRuling(statements: StatementRow[]): Ruling {
   const winner = p > d ? "plaintiff" : "defendant";
   return {
     verdict: winner,
-    reason: `본 법정은 양측이 제출한 진술을 검토하였다. ${winner === "plaintiff" ? "피고" : "원고"}는 주어진 진술 기회 일부를 행사하지 아니하였고, 본 법정은 그 침묵을 불리하게 본다.`,
+    reason: `본 법정은 양측이 제출한 진술을 검토하였다. ${winner === "plaintiff" ? "원고" : "피고"}는 진술 기회를 성실히 행사하였거나 변호인을 선임하여 법리를 다투었고, 본 법정은 이를 유리하게 본다.`,
   };
 }
 
-/** 배심원 없이 AI 재판장이 각자 제출한 진술을 바탕으로 판결한다. 어떤 경우에도 판결은 낸다. */
+/**
+ * AI 재판장이 각자 제출한 진술을 바탕으로 판결한다. 어떤 경우에도 판결은 낸다.
+ * 사건당 AI 예산에서 남은 만큼만 쓰고, 모자라면 부르지 않고 규칙 기반으로 판결한다.
+ */
 export async function aiRuling(c: CaseRow, statements: StatementRow[]): Promise<Ruling> {
   if (!process.env.ANTHROPIC_API_KEY) return ruleBasedRuling(statements);
+  const system = process.env.PROMPT_CANARY ? `${JUDGE_SYSTEM_PROMPT}\n${process.env.PROMPT_CANARY}` : JUDGE_SYSTEM_PROMPT;
+  const content = transcript(c, statements);
+  const remaining = caseBudgetUsd() - Number(c.ai_cost_usd ?? 0);
+  const maxTokens = maxOutputTokens(remaining, estimateInputTokens(system, content), JUDGE_MAX_OUTPUT);
+  if (maxTokens < JUDGE_MIN_OUTPUT) return ruleBasedRuling(statements);
   try {
-    const system = process.env.PROMPT_CANARY ? `${JUDGE_SYSTEM_PROMPT}\n${process.env.PROMPT_CANARY}` : JUDGE_SYSTEM_PROMPT;
     const res = await anthropic().messages.create({
-      model: process.env.ANTHROPIC_MODEL || "claude-opus-5-5",
-      max_tokens: 2000,
+      model: model(),
+      max_tokens: maxTokens,
+      // 판결 한 줄 + 이유 2~3문장. 생각 토큰도 출력 요금이라 낮게 둔다.
+      output_config: { effort: "low" },
       system,
-      messages: [{ role: "user", content: transcript(c, statements) }],
+      messages: [{ role: "user", content }],
     });
+    await addCaseCost(c.id, costOf(res.usage));
     if (res.stop_reason === "refusal") return ruleBasedRuling(statements);
     const raw = res.content
       .filter((b): b is Anthropic.TextBlock => b.type === "text")

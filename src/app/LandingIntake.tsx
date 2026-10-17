@@ -3,7 +3,7 @@
 import { CheckSquare } from "@/components/desk/Stamps";
 import { PickUp } from "@/components/desk/motion";
 import { ApprovalBox, FORM_NO, Sheet } from "@/components/desk/Sheet";
-import { CASE_TYPES } from "@/lib/constants";
+import { CASE_GROUPS, CASE_TYPES } from "@/lib/constants";
 
 /** 책상 위 빈 사건 접수서. 집으면 작성 화면으로 넘어간다. */
 export function LandingIntake() {
@@ -21,9 +21,9 @@ export function LandingIntake() {
             </div>
 
             <ol className="mt-4 space-y-0.5 text-[12.5px] leading-relaxed text-black/70">
-              <li>1. 친구 간 사소한 원한(내기, 읽씹, 노쇼, 빌린 돈 등)에 한하여 접수함.</li>
+              <li>1. 친구 간 사소한 원한(내기·노쇼·지각, 빌린 돈·더치페이, 읽씹·단톡방 잠수, 게임 트롤·스포일러 등)에 한하여 접수함.</li>
               <li>2. 접수된 사건은 통고서로 작성하여 상대방에게 송달함.</li>
-              <li>3. 상대방이 다투는 경우 3회 공방과 배심원 평결을 거쳐 판결함.</li>
+              <li>3. 상대방이 다투는 경우 3회 공방을 거쳐 AI 재판장이 판결함.</li>
             </ol>
 
             <table className="mt-4 w-full border-collapse border-[1.5px] border-ink text-[13px]">
@@ -36,18 +36,18 @@ export function LandingIntake() {
                   </th>
                   <td className="px-1 py-1">
                     <ul className="grid grid-cols-2">
-                      {CASE_TYPES.map((t) => (
-                        <li key={t.id}>
+                      {CASE_GROUPS.map((g) => (
+                        <li key={g.id}>
                           <button
                             type="button"
                             onClick={(e) => {
                               e.stopPropagation();
-                              pick(`/new?type=${t.id}`);
+                              pick(`/new?type=${CASE_TYPES.find((t) => t.group === g.id)!.id}`);
                             }}
                             className="flex min-h-11 w-full items-center gap-2 px-1 text-left text-[13px]"
                           >
                             <CheckSquare checked={false} />
-                            {t.label}
+                            {g.label}
                           </button>
                         </li>
                       ))}

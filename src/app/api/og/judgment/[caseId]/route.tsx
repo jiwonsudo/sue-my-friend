@@ -16,9 +16,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ case
 
   const label = VERDICT_LABEL[j.verdict];
   const date = formatDate(j.created_at);
-  const executed = !!j.executed_at;
   const signer = SIGNER[j.judged_by ?? "system"];
-  const allText = [c.case_no, c.draft.title, c.plaintiff_nick, c.defendant_nick, j.order_text, j.reason_text, label, date, signer, "판결주문이유사건원고피고배심법정집행완료쪽"].join("");
+  const allText = [c.case_no, c.draft.title, c.plaintiff_nick, c.defendant_nick, j.order_text, j.reason_text, label, date, signer, "판결주문이유사건원고피고배심법정쪽"].join("");
   const fonts = await ogFonts(allText);
   const row = (h: string, v: string, size: number, first = false) => (
     <div style={{ display: "flex", borderTop: first ? "none" : `1.5px solid ${OG.ink}` }}>
@@ -62,11 +61,6 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ case
             <div style={{ display: "flex", position: "absolute", right: 56, bottom: 40 }}>
               <StampBox text={label} size={42} />
             </div>
-            {executed && (
-              <div style={{ display: "flex", position: "absolute", right: 40, top: 26 }}>
-                <StampBox text="집행 완료" size={40} rotate={8} />
-              </div>
-            )}
           </div>
         </div>
       ),
@@ -91,7 +85,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ case
             }}
           >
             <FormLine no="친고 서식 제9호" side="(1쪽)" size={24} />
-            <div style={{ display: "flex", fontFamily: "Type", fontSize: 26, color: OG.muted, letterSpacing: 6, marginTop: 56 }}>{SERVICE_NAME} 배심 법정</div>
+            <div style={{ display: "flex", fontFamily: "Type", fontSize: 26, color: OG.muted, letterSpacing: 6, marginTop: 56 }}>{SERVICE_NAME} 간이 법정</div>
             <div style={{ display: "flex", fontSize: 104, fontWeight: 900, letterSpacing: 80, marginTop: 16 }}>판결</div>
             <div style={{ display: "flex", width: 300, height: 12, borderTop: `3px solid ${OG.ink}`, borderBottom: `3px solid ${OG.ink}`, marginTop: 16 }} />
             <div style={{ display: "flex", flexDirection: "column", fontSize: 34, marginTop: 50, border: `3px solid ${OG.ink}` }}>
@@ -111,11 +105,6 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ case
               </div>
               <StampBox text={label} size={62} />
             </div>
-            {executed && (
-              <div style={{ display: "flex", position: "absolute", left: 100, top: 1180 }}>
-                <StampBox text="집행 완료" size={84} rotate={-12} />
-              </div>
-            )}
             <div style={{ display: "flex", height: 1, background: "#e2dacb", marginTop: 44 }} />
             <div style={{ display: "flex", fontSize: 24, color: OG.muted, lineHeight: 1.6, marginTop: 20 }}>{DISCLAIMER}</div>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 30 }}>

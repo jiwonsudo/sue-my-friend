@@ -1,5 +1,6 @@
 "use client";
 
+import { playFold, playSlide, playStamp, playWhoosh } from "@/lib/client/sfx";
 import { motion, useReducedMotion } from "framer-motion";
 import { useEffect, useState } from "react";
 import { RubberStamp, Seal } from "../Seal";
@@ -25,12 +26,28 @@ export function SendSequence({ toNick, fromNick, onDone }: { toNick: string; fro
       return () => clearTimeout(t);
     }
     const ts = [
-      setTimeout(() => setFolded(true), 150),
-      setTimeout(() => setStage("envelope"), T.envelope),
-      setTimeout(() => setStage("close"), T.close),
+      setTimeout(() => {
+        setFolded(true);
+        playFold();
+      }, 150),
+      setTimeout(playFold, 700),
+      setTimeout(() => {
+        setStage("envelope");
+        playSlide();
+      }, T.envelope),
+      setTimeout(() => {
+        setStage("close");
+        playFold();
+      }, T.close),
       setTimeout(() => setStage("stamp"), T.stamp),
-      setTimeout(() => navigator.vibrate?.(60), T.stamp + 520),
-      setTimeout(() => setStage("push"), T.push),
+      setTimeout(() => {
+        navigator.vibrate?.(60);
+        playStamp({ ink: true });
+      }, T.stamp + 340),
+      setTimeout(() => {
+        setStage("push");
+        playWhoosh();
+      }, T.push),
       setTimeout(onDone, T.done),
     ];
     return () => ts.forEach(clearTimeout);

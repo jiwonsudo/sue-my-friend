@@ -1,5 +1,6 @@
 "use client";
 
+import { playSlide } from "@/lib/client/sfx";
 import { AnimatePresence, motion, useReducedMotion, type Variants } from "framer-motion";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -169,6 +170,7 @@ export function PickUp({
   const pick = (to = href) => {
     if (lifted) return;
     setLifted(true);
+    playSlide();
     router.prefetch(to);
     setTimeout(() => router.push(to), reduce ? 0 : 340);
   };

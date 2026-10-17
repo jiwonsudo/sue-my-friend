@@ -2,6 +2,7 @@ import "server-only";
 import Anthropic from "@anthropic-ai/sdk";
 import { CASE_TYPE_LABEL, LIMITS, type CaseType } from "@/lib/constants";
 import type { Draft, Tone } from "@/lib/types";
+import { addCaseCost, caseBudgetUsd, costOf, estimateInputTokens, judgeReserveUsd, maxOutputTokens, model } from "./aiBudget";
 import { fail } from "./http";
 import { DRAFT_ALLOWED_PHRASES, DRAFT_SYSTEM_PROMPT } from "./prompts/draft";
 
@@ -14,6 +15,10 @@ export type DraftInput = {
 };
 
 const CANNOT = "초안을 만들 수 없는 내용이에요";
+const OVER_BUDGET = "이 사건의 AI 사용 한도에 도달했습니다. 지금 초안으로 발송하거나 직접 수정할 것.";
+/** 초안 JSON 이 잘리지 않으려면 최소 이만큼은 출력할 수 있어야 한다 */
+const DRAFT_MIN_OUTPUT = 1200;
+const DRAFT_MAX_OUTPUT = 2500;
 const LEAK_WINDOW = 20;
 
 let client: Anthropic | null = null;
@@ -110,18 +115,27 @@ export function parseDraft(raw: string): Draft | null {
   };
 }
 
-async function callModel(input: DraftInput, tone: Tone, previous: Draft | null): Promise<string | null> {
+async function callModel(
+  input: DraftInput,
+  tone: Tone,
+  previous: Draft | null,
+  maxTokens: number,
+): Promise<{ text: string | null; costUsd: number }> {
   const res = await anthropic().messages.create({
-    model: process.env.ANTHROPIC_MODEL || "claude-opus-5-5",
-    max_tokens: 8000,
+    model: model(),
+    max_tokens: maxTokens,
+    // 짧은 JSON 하나라 깊게 생각할 필요가 없다. 생각 토큰도 출력 요금이라 낮게 둔다.
+    output_config: { effort: "low" },
     system: systemPrompt(),
     messages: [{ role: "user", content: userMessage(input, tone, previous) }],
   });
-  if (res.stop_reason === "refusal") return null;
-  return res.content
+  const costUsd = costOf(res.usage);
+  if (res.stop_reason === "refusal") return { text: null, costUsd };
+  const text = res.content
     .filter((b): b is Anthropic.TextBlock => b.type === "text")
     .map((b) => b.text)
     .join("");
+  return { text, costUsd };
 }
 
 /** 키가 없는 로컬 개발 환경용 가짜 초안 */
@@ -145,14 +159,33 @@ function mockDraft(input: DraftInput, tone: Tone): string {
   });
 }
 
-export async function generateDraft(input: DraftInput, tone: Tone, previous: Draft | null): Promise<Draft> {
+/**
+ * 초안 생성. 사건당 AI 예산(AI 재판장 몫은 남겨 둠) 안에서만 호출하고, 쓴 금액을 돌려준다.
+ * caseId 가 있으면(재생성) 호출할 때마다 바로 사건에 기록한다. 최초 생성은 호출한 쪽이 사건을 만들 때 기록한다.
+ */
+export async function generateDraft(
+  input: DraftInput,
+  tone: Tone,
+  previous: Draft | null,
+  budget: { spentUsd: number; caseId?: string } = { spentUsd: 0 },
+): Promise<{ draft: Draft; costUsd: number }> {
   const useMock = !process.env.ANTHROPIC_API_KEY && process.env.NODE_ENV !== "production";
   let parseFailures = 0;
   let leaks = 0;
+  let costUsd = 0;
   while (true) {
     let raw: string | null;
     try {
-      raw = useMock ? mockDraft(input, tone) : await callModel(input, tone, previous);
+      if (useMock) raw = mockDraft(input, tone);
+      else {
+        const remaining = caseBudgetUsd() - judgeReserveUsd() - budget.spentUsd - costUsd;
+        const maxTokens = maxOutputTokens(remaining, estimateInputTokens(systemPrompt(), userMessage(input, tone, previous)), DRAFT_MAX_OUTPUT);
+        if (maxTokens < DRAFT_MIN_OUTPUT) fail(429, OVER_BUDGET);
+        const r = await callModel(input, tone, previous, maxTokens);
+        costUsd += r.costUsd;
+        if (budget.caseId) await addCaseCost(budget.caseId, r.costUsd);
+        raw = r.text;
+      }
     } catch (e) {
       if (e instanceof Anthropic.RateLimitError) fail(429, "요청이 많아요. 잠시 후 다시 시도해주세요.");
       if (e instanceof Anthropic.APIError) {
@@ -169,7 +202,7 @@ export async function generateDraft(input: DraftInput, tone: Tone, previous: Dra
     }
     leaks = 0;
     const draft = parseDraft(raw);
-    if (draft && !looksLeaked(JSON.stringify(draft))) return draft;
+    if (draft && !looksLeaked(JSON.stringify(draft))) return { draft, costUsd };
     if (++parseFailures > 1) fail(422, CANNOT);
   }
 }

@@ -8,12 +8,13 @@ import { DefendantAvatar, JudgeAvatar, PlaintiffAvatar } from "@/components/Avat
 import { Countdown } from "@/components/Countdown";
 import { CutIn } from "@/components/CutIn";
 import { Header } from "@/components/Header";
+import { adsAvailable, RewardedAd } from "@/components/RewardedAd";
 import { ShareButtons } from "@/components/ShareButtons";
-import { VoteBars } from "@/components/VoteBars";
 import { Typewriter } from "@/components/Typewriter";
 import { api } from "@/lib/client/api";
 import { isMuted, setMuted } from "@/lib/client/sfx";
-import { CARD_NOTICE, CUTIN_LINES, DEFENSE_CARDS, LIMITS, type CardId } from "@/lib/constants";
+import { CUTIN_LINES, DEFENSE_CARDS, LIMITS } from "@/lib/constants";
+import { LAW_BY_ID, lawLabel, type LawyerSuggestion } from "@/lib/laws";
 import { KIND_LABEL, otherRole, rebuttalTarget, ROLE_LABEL } from "@/lib/trial";
 import type { PublicEvidence, Role, StatementRow, TrialView } from "@/lib/types";
 
@@ -21,14 +22,12 @@ const POLL_MS = 5000;
 
 export function TrialClient({
   initial,
-  juryLink,
-  juryImage,
   canSwitch,
+  notifyLinks,
 }: {
   initial: TrialView;
-  juryLink: string | null;
-  juryImage: string | null;
   canSwitch: boolean;
+  notifyLinks: Record<Role, string>;
 }) {
   const router = useRouter();
   const [view, setView] = useState(initial);
@@ -36,10 +35,8 @@ export function TrialClient({
   const [cutIn, setCutIn] = useState<{ line: string; by: string } | null>(null);
   const [muted, setMutedState] = useState(false);
   const [zoom, setZoom] = useState<PublicEvidence | null>(null);
-  const [showJury, setShowJury] = useState(false);
-  const [jury, setJury] = useState<{ link: string; image: string } | null>(juryLink && juryImage ? { link: juryLink, image: juryImage } : null);
-  const [inviting, setInviting] = useState(false);
-  const [inviteError, setInviteError] = useState<string | null>(null);
+  // 내 진술을 낸 직후에는 상대에게 알릴 공유 버튼을 펼쳐 둔다
+  const [showNotify, setShowNotify] = useState(false);
 
 
   const logEnd = useRef<HTMLDivElement>(null);
@@ -54,20 +51,7 @@ export function TrialClient({
     } catch {}
   }, [view.caseId, me, router]);
 
-  const invite = async () => {
-    setInviting(true);
-    setInviteError(null);
-    try {
-      const r = await api<{ jury: string }>(`/api/cases/${view.caseId}/jury`, { json: {} });
-      setJury({ link: r.jury, image: `${new URL(r.jury).origin}/api/og/jury/${r.jury.split("/j/")[1]}` });
-      setShowJury(true);
-      refresh();
-    } catch (e) {
-      setInviteError(e instanceof Error ? e.message : "초대 실패");
-    } finally {
-      setInviting(false);
-    }
-  };
+
   useEffect(() => {
     setMutedState(isMuted());
     const t = setInterval(() => document.visibilityState === "visible" && refresh(), POLL_MS);
@@ -97,18 +81,35 @@ export function TrialClient({
   }, [view.statements.length]);
 
   const latest = [...view.statements].reverse().find((s) => !s.forfeited);
-  const speaker: Role | "judge" = latest && view.status === "trial" ? latest.role : "judge";
   const judgeLine = useMemo(() => {
-    if (view.status === "voting") return "공방을 종결합니다. 이제 배심원의 판단을 구하겠습니다.";
+    if (view.status === "voting") return "공방을 종결합니다. 곧 판결을 선고하겠습니다.";
     const c = view.current;
     if (!c) return "";
-    const who = `${ROLE_LABEL[c.role]} ${nick(c.role)}`;
-    if (c.kind === "testimony") return `${c.round}라운드. ${who}은(는) 증언하십시오.`;
-    if (c.kind === "rebuttal") return `${who}은(는) 상대 증언 중 한 문장을 골라 반박하십시오.`;
-    return `최후진술입니다. ${who}, 한 문장으로 말씀하십시오.`;
+    const side = `${ROLE_LABEL[c.role]} 측 ${nick(c.role)}`;
+    const forfeited = view.statements.at(-1)?.forfeited ? "직전 진술은 기한 경과로 포기 처리되었습니다. " : "";
+    if (c.kind === "testimony") return `${forfeited}${c.round}라운드를 시작합니다. ${side}, 증언하십시오.`;
+    if (c.kind === "rebuttal") return `${forfeited}${side}, 상대 증언 중 한 문장을 골라 반박하십시오.`;
+    return `${forfeited}최후진술입니다. ${side}, 한 문장으로 말씀하십시오.`;
   }, [view, nick]);
 
-  const dialogText = latest && view.status === "trial" ? latest.sentences.join(" ") : judgeLine;
+  // 마지막 진술을 먼저 읽어 주고, 다 읽으면 재판장이 다음 차례를 부른다
+  const [judgeTurn, setJudgeTurn] = useState(!latest);
+  const latestId = latest?.id;
+  const latestText = latest?.sentences.join(" ") ?? "";
+  useEffect(() => {
+    if (!latestId || view.status !== "trial") {
+      setJudgeTurn(true);
+      return;
+    }
+    setJudgeTurn(false);
+    const t = setTimeout(() => setJudgeTurn(true), [...latestText].length * 38 + 1800);
+    return () => clearTimeout(t);
+    // 진술이 새로 올라왔을 때만 (5초마다 오는 폴링 응답으로는 다시 시작하지 않음)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [latestId, view.status]);
+
+  const speaker: Role | "judge" = judgeTurn || !latest ? "judge" : latest.role;
+  const dialogText = speaker === "judge" ? judgeLine : latestText;
   const myTurn = view.status === "trial" && view.current?.role === me;
   const evidenceById = useMemo(() => new Map(view.evidence.map((e) => [e.id, e])), [view.evidence]);
 
@@ -195,49 +196,52 @@ export function TrialClient({
       <div className="fixed inset-x-0 bottom-0 z-20 max-h-[64dvh] overflow-y-auto border-t border-white/15 bg-court px-4 pt-3 pb-[max(12px,env(safe-area-inset-bottom))]">
         <div className="mx-auto max-w-md">
           {view.status === "voting" ? (
-            <VotingPanel view={view} />
+            <p className="py-3 text-center font-type text-[13px] text-white/70">판결 선고 대기 중</p>
           ) : myTurn && view.current ? (
-            <Compose view={view} me={me} onDone={refresh} />
+            <Compose
+              // 차례가 바뀌면 입력·선택한 조항을 새로 시작
+              key={`${view.current.round}-${view.current.kind}`}
+              view={view}
+              onDone={() => {
+                setShowNotify(true);
+                refresh();
+              }}
+            />
           ) : view.current ? (
-            <p className="py-3 text-center font-type text-[13px] text-white/70">
-              상대 {KIND_LABEL[view.current.kind]} 대기 · 남은 시간{" "}
-              <Countdown deadline={view.current.deadline} format="hm" className="font-bold text-white" />
-            </p>
-          ) : null}
-          {jury ? (
-            <>
+            <div className="pb-1">
+              <p className="py-2 text-center font-type text-[13px] text-white/70">
+                {nick(view.current.role)} {KIND_LABEL[view.current.kind]} 대기 · 남은 시간{" "}
+                <Countdown deadline={view.current.deadline} format="hm" className="font-bold text-white" />
+              </p>
               <button
                 type="button"
-                onClick={() => setShowJury((v) => !v)}
-                aria-expanded={showJury}
-                className="mt-2 min-h-11 w-full border border-white/25 font-serif text-[14px] font-bold"
+                onClick={() => setShowNotify((v) => !v)}
+                aria-expanded={showNotify}
+                className="min-h-12 w-full bg-paper font-serif text-[15px] font-bold text-ink shadow-[inset_0_-2px_0_rgb(0_0_0/0.15)]"
               >
-                배심원 모집 링크 {showJury ? "닫기" : "보기"}
+                {nick(view.current.role)}에게 차례 알리기
               </button>
-              {showJury && (
-                <div className="mt-2">
+              {showNotify && (
+                <div className="mt-2 space-y-1.5">
+                  <p className="text-center font-type text-[11.5px] text-white/55">
+                    링크를 받은 쪽은 바로 공방 화면으로 들어옴. 기한 안에 진술하지 않으면 진술 포기로 처리됨.
+                  </p>
                   <ShareButtons
                     compact
-                    url={jury.link}
-                    title={`${view.title} — 배심원을 모집합니다`}
-                    text="공방 기록을 읽고 원고 승·피고 승·쌍방 과실 중 하나에 투표."
-                    imageUrl={jury.image}
-                    buttonLabel="배심원 참여"
+                    url={notifyLinks[view.current.role]}
+                    title={`[${view.caseNo}] ${nick(view.current.role)}님 ${KIND_LABEL[view.current.kind]} 차례입니다`}
+                    text={`${view.title} — ${ROLE_LABEL[me]} ${nick(me)}의 진술이 제출됨. 기한 6시간.`}
+                    buttonLabel="공방 입장"
                   />
                 </div>
               )}
-            </>
-          ) : view.status === "trial" ? (
-            <div className="mt-2 border-t border-dashed border-white/15 pt-2">
-              <button type="button" disabled={inviting} onClick={invite} className="min-h-11 w-full border border-white/25 font-serif text-[14px] font-bold disabled:opacity-40">
-                배심원 초대
-              </button>
-              <p className="mt-1.5 text-center font-type text-[11px] leading-relaxed text-white/45">
-                미초대 시 공방 종료 즉시 AI 재판장이 양측 진술로 판결함.
-              </p>
-              {inviteError && <p className="text-center text-sm text-red-300">{inviteError}</p>}
             </div>
           ) : null}
+          {view.status === "trial" && (
+            <p className="mt-2 border-t border-dashed border-white/15 pt-2 text-center font-type text-[11px] leading-relaxed text-white/50">
+              3라운드가 끝나면 AI 재판장이 양측 진술을 검토해 바로 판결함.
+            </p>
+          )}
         </div>
       </div>
 
@@ -361,6 +365,11 @@ function StatementCard({
               <li key={i}>{s.kind === "testimony" ? `${i + 1}. ${t}` : t}</li>
             ))}
           </ol>
+          {s.law_id && LAW_BY_ID.get(s.law_id) && (
+            <p className="mt-2 inline-block border border-brass/60 bg-brass/10 px-2 py-0.5 font-type text-[11px] text-[#f0d896]">
+              변호인 인용 · {lawLabel(LAW_BY_ID.get(s.law_id)!)}
+            </p>
+          )}
           {(card || ev) && (
             <div className="mt-2 flex flex-wrap gap-2">
               {card && <span className="border border-amber-300/60 px-2 py-1 font-type text-[11.5px] text-amber-200">항변 {card.name}</span>}
@@ -382,48 +391,28 @@ function StatementCard({
   );
 }
 
-function Compose({ view, me, onDone }: { view: TrialView; me: Role; onDone: () => void }) {
+function Compose({ view, onDone }: { view: TrialView; onDone: () => void }) {
   const slot = view.current!;
   const [lines, setLines] = useState<string[]>([""]);
   const [targetIdx, setTargetIdx] = useState<number | null>(null);
-  const [cardId, setCardId] = useState<CardId | null>(null);
-  const [ev, setEv] = useState<PublicEvidence | null>(null);
+  const [lawId, setLawId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const target = slot.kind === "rebuttal" ? rebuttalTarget(view.statements, slot.round) : null;
   const needsTarget = !!target && !target.forfeited;
   const max = slot.kind === "testimony" ? 4 : 1;
   const filled = lines.map((l) => l.trim()).filter(Boolean);
-
-  const upload = async (file: File) => {
-    if (file.size > LIMITS.evidenceBytes) return setError("5MB 이하 이미지만 첨부 가능.");
-    setBusy(true);
-    setError(null);
-    try {
-      const fd = new FormData();
-      fd.append("file", file);
-      setEv(await api<PublicEvidence>(`/api/cases/${view.caseId}/evidence?as=${me}`, { method: "POST", body: fd }));
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "업로드 실패");
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const rename = async (label: string) => {
-    if (!ev || !label.trim() || label === ev.label) return;
-    try {
-      const r = await api<{ label: string }>(`/api/cases/${view.caseId}/evidence/${ev.id}?as=${me}`, { method: "PATCH", json: { label } });
-      setEv({ ...ev, label: r.label });
-    } catch {}
-  };
+  // 반박할 문장이 하나뿐이면 고를 필요 없이 그 문장
+  const chosen = targetIdx ?? (target && target.sentences.length === 1 ? 0 : null);
+  const missing =
+    needsTarget && chosen == null ? "위에서 반박할 문장을 먼저 고를 것" : filled.length === 0 ? `${slot.kind === "testimony" ? "증언" : "한 문장"}을 쓸 것` : null;
 
   const submit = async () => {
     setBusy(true);
     setError(null);
     try {
       await api(`/api/cases/${view.caseId}/statements`, {
-        json: { sentences: filled, targetSentenceIdx: targetIdx, cardId, evidenceId: ev?.id ?? null },
+        json: { sentences: filled, targetSentenceIdx: chosen, lawId },
       });
       setLines([""]);
       onDone();
@@ -448,24 +437,55 @@ function Compose({ view, me, onDone }: { view: TrialView; me: Role; onDone: () =
 
       {needsTarget && target && (
         <div>
-          <p className="mb-1.5 font-type text-[12px] text-white/60">반박할 문장 선택</p>
-          <div className="space-y-1.5">
+          <p className="mb-1.5 font-type text-[12px] text-white/60">
+            ① 반박할 문장 {target.sentences.length > 1 ? "하나를 눌러 고를 것" : "(자동 선택됨)"}
+          </p>
+          <div role="radiogroup" aria-label="반박할 문장" className="space-y-1.5">
             {target.sentences.map((t, i) => (
               <button
                 key={i}
                 type="button"
+                role="radio"
+                aria-checked={chosen === i}
                 onClick={() => setTargetIdx(i)}
-                className={`block min-h-11 w-full border px-3 py-2 text-left text-[14px] ${
-                  targetIdx === i ? "border-seal bg-seal/25" : "border-white/15 bg-white/5"
+                className={`flex min-h-11 w-full items-start gap-2.5 border px-3 py-2 text-left text-[14px] ${
+                  chosen === i ? "border-seal bg-seal/25" : "border-white/15 bg-white/5"
                 }`}
               >
+                <span
+                  aria-hidden
+                  className={`mt-1 grid h-4 w-4 shrink-0 place-items-center rounded-full border-[1.5px] ${chosen === i ? "border-seal" : "border-white/40"}`}
+                >
+                  {chosen === i && <span className="h-2 w-2 rounded-full bg-seal" />}
+                </span>
                 {t}
               </button>
             ))}
           </div>
+          <p className="mt-3 font-type text-[12px] text-white/60">② 반박 한 문장</p>
         </div>
       )}
 
+      {slot.kind === "rebuttal" && view.lawyer && (
+        <LawyerPanel
+          caseId={view.caseId}
+          initial={view.lawyer}
+          chosenLawId={lawId}
+          onPick={(sg) => {
+            setLawId(sg.lawId);
+            if (sg.targetIdx != null) setTargetIdx(sg.targetIdx);
+            setLines([sg.sentence]);
+          }}
+        />
+      )}
+      {lawId && LAW_BY_ID.get(lawId) && (
+        <p className="flex items-center justify-between gap-2 border border-brass/60 bg-brass/10 px-2.5 py-1.5 font-type text-[11.5px] text-[#f0d896]">
+          <span>변호인 인용 · {lawLabel(LAW_BY_ID.get(lawId)!)}</span>
+          <button type="button" className="min-h-8 px-1 text-white/50 underline" onClick={() => setLawId(null)}>
+            빼기
+          </button>
+        </p>
+      )}
       {lines.map((l, i) => (
         <input
           key={i}
@@ -482,80 +502,124 @@ function Compose({ view, me, onDone }: { view: TrialView; me: Role; onDone: () =
         </button>
       )}
 
-      {slot.kind === "rebuttal" && (
-        <>
-          <div>
-            <p className="mb-1.5 font-type text-[12px] text-white/60">항변 카드 (선택)</p>
-            <div className="no-scrollbar -mx-4 flex gap-2 overflow-x-auto px-4">
-              {DEFENSE_CARDS.map((c) => (
-                <button
-                  key={c.id}
-                  type="button"
-                  onClick={() => setCardId(cardId === c.id ? null : c.id)}
-                  className={`min-h-16 w-28 shrink-0 border p-2 text-left font-serif text-[12.5px] font-bold ${
-                    cardId === c.id ? "border-amber-300 bg-amber-300/15 text-amber-100" : "border-white/15 bg-white/5"
-                  }`}
-                >
-                  {c.name}
-                </button>
-              ))}
-            </div>
-            {cardId && (
-              <div className="mt-2 bg-amber-100 p-3 text-[12px] text-ink">
-                <p>{DEFENSE_CARDS.find((c) => c.id === cardId)!.desc}</p>
-                <p className="mt-1 text-[10px] text-black/50">{CARD_NOTICE}</p>
-              </div>
-            )}
-          </div>
-          <div className="flex items-center gap-2">
-            {ev ? (
-              <>
-                {ev.url && (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={ev.url} alt="" className="h-11 w-11 object-cover" />
-                )}
-                <input
-                  defaultValue={ev.label}
-                  maxLength={LIMITS.label}
-                  onBlur={(e) => rename(e.target.value)}
-                  className="min-h-11 flex-1 border-b border-white/30 bg-transparent px-1 font-type text-[14px]"
-                  aria-label="증거 이름"
-                />
-                <button type="button" className="min-h-11 px-2 text-xs text-white/60" onClick={() => setEv(null)}>
-                  빼기
-                </button>
-              </>
-            ) : (
-              <label className="flex min-h-11 cursor-pointer items-center border border-dashed border-white/25 px-3 font-type text-[12.5px] text-white/70">
-                증거 사진 첨부 (선택, 5MB 이하)
-                <input type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files?.[0] && upload(e.target.files[0])} />
-              </label>
-            )}
-          </div>
-        </>
-      )}
-
       {error && <p className="text-sm text-red-300">{error}</p>}
       <button
         type="button"
-        disabled={busy || filled.length === 0 || (needsTarget && targetIdx == null)}
+        disabled={busy || !!missing}
         onClick={submit}
         className="min-h-14 w-full bg-seal font-serif text-[18px] font-black tracking-[0.06em] shadow-[inset_0_-3px_0_rgb(0_0_0/0.25)] disabled:opacity-40"
       >
         {busy ? "제출 중" : slot.kind === "rebuttal" ? "이의 있음!" : `${label} 제출`}
       </button>
+      {missing && !busy && <p className="-mt-1 text-center font-type text-[12px] text-[#ffb3a8]">{missing}</p>}
     </div>
   );
 }
 
-function VotingPanel({ view }: { view: TrialView }) {
-  const total = view.votes.plaintiff + view.votes.defendant + view.votes.both;
+/**
+ * 광고 보상형 AI 변호인: 반박 차례마다 1번. 광고를 보면 법 조항을 인용한 이의 2~3개를 추천받고 하나를 골라 제출한다.
+ * 고른 이의는 재판장이 가산점을 준다.
+ */
+function LawyerPanel({
+  caseId,
+  initial,
+  chosenLawId,
+  onPick,
+}: {
+  caseId: string;
+  initial: NonNullable<TrialView["lawyer"]>;
+  chosenLawId: string | null;
+  onPick: (s: LawyerSuggestion) => void;
+}) {
+  const [suggestions, setSuggestions] = useState<LawyerSuggestion[] | null>(initial.suggestions);
+  const [phase, setPhase] = useState<"idle" | "ad" | "working">("idle");
+  const [error, setError] = useState<string | null>(null);
+  const ticket = useRef<{ value: string; at: number; minMs: number } | null>(null);
+
+  if (initial.used && !suggestions) return null;
+  if (!suggestions && !adsAvailable) return null;
+
+  const start = async () => {
+    setError(null);
+    try {
+      const r = await api<{ ticket: string; minAdMs: number }>(`/api/cases/${caseId}/lawyer`, { json: { action: "ticket" } });
+      ticket.current = { value: r.ticket, at: Date.now(), minMs: r.minAdMs };
+      setPhase("ad");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "광고를 불러오지 못했습니다.");
+    }
+  };
+
+  const grant = async () => {
+    const t = ticket.current;
+    if (!t) return;
+    setPhase("working");
+    // 광고가 너무 빨리 끝났으면(광고 없음 등) 서버 최소 시간까지 기다린다
+    const wait = t.at + t.minMs + 300 - Date.now();
+    if (wait > 0) await new Promise((r) => setTimeout(r, wait));
+    try {
+      const r = await api<{ suggestions: LawyerSuggestion[] }>(`/api/cases/${caseId}/lawyer`, { json: { action: "grant", ticket: t.value } });
+      setSuggestions(r.suggestions);
+      setPhase("idle");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "선임 실패");
+      setPhase("idle");
+    }
+  };
+
   return (
-    <div className="space-y-2 py-1">
-      <p className="text-center font-type text-[13px]">
-        배심원 평의 중 · 마감까지 <Countdown deadline={view.votingDeadline} format="hm" className="font-bold" />
-      </p>
-      <VoteBars votes={view.votes} total={total} plaintiff={view.plaintiffNick} defendant={view.defendantNick} />
+    <div className="border border-brass/40 bg-[#2a1a0e] p-3">
+      {!suggestions ? (
+        <>
+          <p className="font-serif text-[14px] font-bold text-[#f0d896]">변호인 선임</p>
+          <p className="mt-1 font-type text-[11.5px] leading-relaxed text-white/60">
+            광고를 끝까지 보면 AI 변호인이 법 조항을 인용한 이의를 써 줌. 변호인을 쓴 진술은 재판장이 가산점을 줌. 이번 반박 차례에 1번.
+          </p>
+          <button
+            type="button"
+            disabled={phase !== "idle"}
+            onClick={start}
+            className="brass-plate mt-2.5 min-h-12 w-full font-serif text-[15px] font-bold text-[#2a1a0c] disabled:opacity-50"
+          >
+            {phase === "working" ? "변호인이 검토 중" : "광고 보고 변호인 선임"}
+          </button>
+        </>
+      ) : (
+        <>
+          <p className="font-serif text-[14px] font-bold text-[#f0d896]">변호인 의견 · 하나를 골라 제출</p>
+          <div role="radiogroup" aria-label="변호인 추천 이의" className="mt-2 space-y-1.5">
+            {suggestions.map((sg) => {
+              const law = LAW_BY_ID.get(sg.lawId);
+              const on = chosenLawId === sg.lawId;
+              return (
+                <button
+                  key={sg.lawId}
+                  type="button"
+                  role="radio"
+                  aria-checked={on}
+                  onClick={() => onPick(sg)}
+                  className={`block min-h-11 w-full border px-3 py-2 text-left ${on ? "border-brass bg-brass/15" : "border-white/15 bg-white/5"}`}
+                >
+                  {law && <span className="block font-type text-[11px] text-[#f0d896]">{lawLabel(law)}</span>}
+                  <span className="mt-0.5 block text-[14px] leading-snug">{sg.sentence}</span>
+                  {law && <span className="mt-1 block font-type text-[10.5px] leading-snug text-white/45">요지: {law.gist}</span>}
+                </button>
+              );
+            })}
+          </div>
+          <p className="mt-1.5 font-type text-[10px] text-white/40">게임용 인용이며 실제 법률 판단이 아님. 고른 뒤 문장은 고쳐 써도 됨.</p>
+        </>
+      )}
+      {error && <p className="mt-2 text-center text-[12.5px] text-red-300">{error}</p>}
+      {phase === "ad" && (
+        <RewardedAd
+          onReward={() => grant()}
+          onCancel={() => {
+            setPhase("idle");
+            setError("광고를 끝까지 봐야 선임됨.");
+          }}
+        />
+      )}
     </div>
   );
 }
