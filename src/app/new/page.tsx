@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { Header } from "@/components/Header";
 import { CASE_TYPES, LIMITS, type CaseType } from "@/lib/constants";
 import { rolesForCase } from "@/server/auth";
 import { loadCase } from "@/server/cases";
@@ -37,16 +36,13 @@ export default async function NewPage({
   }
 
   return (
-    <>
-      <Header />
-      <NewCaseFlow
+    <NewCaseFlow
         resume={resume}
         initial={{
           type,
           plaintiff_nick: (sp.me ?? "").slice(0, LIMITS.nick),
           defendant_nick: (sp.them ?? "").slice(0, LIMITS.nick),
         }}
-      />
-    </>
+    />
   );
 }

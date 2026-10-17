@@ -77,9 +77,9 @@ export function ShareButtons({
     });
   };
 
-  const btn = "min-h-11 rounded-xl px-4 text-[15px] font-semibold transition active:scale-[0.98]";
+  const btn = "min-h-11 rounded-[2px] px-4 font-serif text-[15px] font-bold transition active:translate-y-px";
   return (
-    <div className={`grid gap-2 ${compact ? "grid-cols-2" : "grid-cols-1"}`}>
+    <div className={`grid grid-cols-1 ${compact ? "gap-1.5" : "gap-2"}`}>
       {KAKAO_KEY && (
         <Script
           src="https://t1.kakaocdn.net/kakao_js_sdk/2.7.4/kakao.min.js"
@@ -91,15 +91,15 @@ export function ShareButtons({
         type="button"
         onClick={kakao}
         disabled={Boolean(KAKAO_KEY) && !kakaoReady}
-        className={`${btn} bg-[#FEE500] text-black`}
+        className={`${btn} bg-[#FEE500] text-black shadow-[inset_0_-2px_0_rgb(0_0_0/0.15)]`}
       >
         카톡으로 보내기
       </button>
       <div className="grid grid-cols-2 gap-2">
-        <button type="button" onClick={copy} className={`${btn} border border-black/15 bg-white`}>
+        <button type="button" onClick={copy} className={`${btn} bg-paper text-ink shadow-[inset_0_-2px_0_rgb(0_0_0/0.12)]`}>
           {copied ? "복사됨" : "링크 복사"}
         </button>
-        <button type="button" onClick={share} className={`${btn} bg-ink text-white`}>
+        <button type="button" onClick={share} className={`${btn} border border-paper/35 text-paper`}>
           공유
         </button>
       </div>

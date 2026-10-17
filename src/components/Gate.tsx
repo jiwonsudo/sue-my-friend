@@ -1,17 +1,24 @@
 import Link from "next/link";
-import { Header } from "./Header";
+import { Desk } from "./desk/Desk";
+import { FORM_NO, Sheet } from "./desk/Sheet";
+import { btn } from "./desk/ui";
+import { RubberStamp } from "./Seal";
 
+/** 들어갈 수 없는 화면: 책상 위에 되돌아온 반려 쪽지 */
 export function Gate({ title, body }: { title: string; body: string }) {
   return (
-    <>
-      <Header />
-      <main className="mx-auto flex max-w-md flex-col items-center px-6 pt-24 text-center">
-        <p className="mb-2 font-serif text-xl font-bold">{title}</p>
-        <p className="mb-8 text-sm leading-relaxed text-muted">{body}</p>
-        <Link href="/" className="min-h-11 rounded-xl border border-black/15 px-5 py-3 text-sm font-semibold">
-          처음으로
-        </Link>
-      </main>
-    </>
+    <Desk scene="plain">
+      <Sheet formNo={FORM_NO.returned} side="반려 통지" className="mt-10 rotate-[-0.6deg] font-serif">
+        <div className="relative px-6 pt-6 pb-8">
+          <RubberStamp text="반 려" className="absolute top-2 right-5 rotate-[8deg] text-2xl" />
+          <p className="mb-1 font-type text-[11px] tracking-[0.2em] text-black/45">처리 결과</p>
+          <h1 className="mb-4 max-w-[13em] text-[21px] leading-snug font-black">{title}</h1>
+          <p className="mb-8 text-[14.5px] leading-relaxed text-black/70">{body}</p>
+          <Link href="/" className={`${btn.onPaper} w-full`}>
+            처음으로
+          </Link>
+        </div>
+      </Sheet>
+    </Desk>
   );
 }

@@ -1,4 +1,4 @@
-// 친구 고소하기 E2E (API 수준)
+// 내 친구 고소하기 E2E (API 수준)
 // 준비: 로컬 Supabase(docker) + `pnpm dev` 실행 중. ANTHROPIC_API_KEY 는 비워 두면 가짜 초안으로 빠르게 돈다.
 // 실행: pnpm test:e2e   (다른 주소면 E2E_BASE=http://localhost:3001 pnpm test:e2e)
 // 주의: 로컬 DB 에 테스트 사건을 만든다. 마감 조작은 docker exec 로 psql 을 쓴다.
@@ -95,9 +95,14 @@ ok((await D.req(`/api/cases/${id}/statements`, { method: "POST", json: { sentenc
 ok((await D.req(`/api/cases/${id}/statements`, { method: "POST", json: { sentences: ["저는 치킨을 사려 했습니다.", "가게가 문을 닫았습니다."] } })).status === 200, "R2 피고 증언");
 ok((await P.req(`/api/cases/${id}/statements`, { method: "POST", json: { sentences: ["그 가게는 24시간입니다."], targetSentenceIdx: 1, cardId: "delay" } })).status === 200, "R2 원고 반박");
 ok((await P.req(`/api/cases/${id}/statements`, { method: "POST", json: { sentences: ["치킨은 식기 전에 받아야 합니다.", "두 문장"] } })).status === 400, "최후진술 1문장 제한");
+const preHtml = (await P.req(`/case/${id}/trial?as=plaintiff`)).data;
+ok(!/\/j\/[A-Za-z0-9_-]{40,}/.test(preHtml), "초대 전 공방 화면에 배심원 링크 없음");
+ok((await stranger.req(`/api/cases/${id}/jury`, { method: "POST", json: {} })).status === 403, "남은 배심원 초대 불가");
+const inv = await D.req(`/api/cases/${id}/jury`, { method: "POST", json: {} });
+ok(inv.status === 200 && /\/j\/[A-Za-z0-9_-]{40,}/.test(inv.data.jury ?? ""), "피고가 배심원 초대");
 ok((await P.req(`/api/cases/${id}/statements`, { method: "POST", json: { sentences: ["치킨은 식기 전에 받아야 합니다."] } })).status === 200, "R3 원고 최후진술");
 ok((await D.req(`/api/cases/${id}/statements`, { method: "POST", json: { sentences: ["저는 결백합니다."] } })).status === 200, "R3 피고 최후진술");
-ok(sql(`select status from cases where id='${id}'`) === "voting", "3라운드 후 voting");
+ok(sql(`select status from cases where id='${id}'`) === "voting", "배심원 초대한 사건은 3라운드 후 voting");
 const tv = await P.req(`/api/cases/${id}/trial?as=plaintiff`);
 ok(tv.status === 200 && tv.data.statements.length === 6 && !JSON.stringify(tv.data).includes("token_salt"), "공방 상태 조회 (salt 비노출)");
 
@@ -114,7 +119,7 @@ const v3 = await J3.req(`/api/j/${jury}/vote`, { method: "POST", json: { verdict
 ok(v3.data.votes?.plaintiff === 2 && v3.data.votes?.both === 1, "득표 집계");
 sql(`update cases set voting_deadline_at = now() - interval '1 minute' where id='${id}'`);
 const vpage = await stranger.req(`/v/${id}`);
-ok(sql(`select verdict from judgments where case_id='${id}'`) === "plaintiff", "마감 후 최다 득표 판결 (원고 승)");
+ok(sql(`select verdict || ':' || judged_by from judgments where case_id='${id}'`) === "plaintiff:jury", "마감 후 최다 득표 판결 (원고 승, 배심원)");
 // 판결문 본문은 망치 연출 뒤 클라이언트에서 그려지므로 서버가 내려준 주문 문구로 확인
 ok(vpage.status === 200 && vpage.data.includes(sql(`select order_text from judgments where case_id='${id}'`)), "판결 페이지에 주문");
 ok(sql(`select reason_text from judgments where case_id='${id}'`).includes("가장 많이 반박당한"), "이유에 반박당한 문장 인용");
@@ -142,7 +147,7 @@ ok(acc.status === 200 && sql(`select verdict from judgments where case_id='${c2}
 ok(sql(`select order_text from judgments where case_id='${c2}'`).includes("인낙"), "합의 주문 템플릿");
 ok((await D2.req(`/api/c/${l2.def}/respond`, { method: "POST", json: { action: "object" } })).status === 409, "중복 대응 불가");
 
-console.log("\n[8] 24시간 무응답 → 궐석");
+console.log("\n[8] 답변 기한 무응답 → 궐석");
 const P3 = new Jar("p3", "10.6.6.6");
 const c3 = (await newCase(P3)).data.caseId; await sendAndLink(P3, c3);
 sql(`update cases set response_deadline_at = now() - interval '1 minute' where id='${c3}'`);
@@ -150,14 +155,15 @@ await P3.req(`/case/${c3}`);
 ok(sql(`select verdict from judgments where case_id='${c3}'`) === "default", "궐석 판결");
 ok(sql(`select order_text from judgments where case_id='${c3}'`).startsWith("피고는 도주하였다"), "궐석 주문 '피고는 도주하였다'");
 
-console.log("\n[9] 맞고소 + 턴 만료 → 진술 포기 → 투표 0표 → 쌍방 과실");
+console.log("\n[9] 맞고소 + 배심원 미초대 + 턴 만료 → 진술 포기 → AI 재판장 판결");
 const P4 = new Jar("p4", "10.7.7.7"), D4 = new Jar("d4", "10.8.8.8");
 const c4 = (await newCase(P4)).data.caseId; const l4 = await sendAndLink(P4, c4);
 await D4.req(`/api/c/${l4.def}/respond`, { method: "POST", json: { action: "countersue" } });
 sql(`update cases set trial_started_at = now() - interval '7 days' where id='${c4}'`);
 await P4.req(`/api/cases/${c4}/trial?as=plaintiff`);
 ok(sql(`select count(*) from statements where case_id='${c4}' and forfeited`) === "6", "만료된 턴 6개 진술 포기 기록");
-ok(sql(`select verdict from judgments where case_id='${c4}'`) === "both", "0표 → 쌍방 과실");
+ok(sql(`select judged_by from judgments where case_id='${c4}'`) === "judge", "배심원 미초대 → AI 재판장 판결 (투표 단계 없음)");
+ok(sql(`select voting_deadline_at is null from cases where id='${c4}'`) === "t", "미초대 사건은 투표 마감 없음");
 
 console.log("\n[10] 기각");
 const P5 = new Jar("p5", "10.10.0.1"), D5 = new Jar("d5", "10.10.0.2");
@@ -167,7 +173,22 @@ await D5.req(`/api/c/${l5.def}/dismiss`, { method: "POST", json: {} });
 ok((await D5.req(`/c/${l5.def}`)).data.includes("기각된 사건"), "피고 화면 문서 숨김");
 ok((await P5.req(`/case/${c5}`)).data.includes("기각했습니다"), "원고 진행 차단");
 
-console.log("\n[11] IP당 시간당 초안 10회");
+console.log("\n[11] 배심원 초대했지만 0표 → AI 재판장, 초대 전 투표 불가");
+const P7 = new Jar("p7", "10.12.0.1"), D7 = new Jar("d7", "10.12.0.2"), J7 = new Jar("j7", "10.12.0.3");
+const c7 = (await newCase(P7)).data.caseId; const l7 = await sendAndLink(P7, c7);
+await D7.req(`/api/c/${l7.def}/respond`, { method: "POST", json: { action: "object" } });
+const inv7 = await P7.req(`/api/cases/${c7}/jury`, { method: "POST", json: {} });
+const jt7 = inv7.data.jury.split("/j/")[1];
+ok((await J7.req(`/j/${jt7}`)).status === 200, "초대 후 배심원 페이지 열림");
+sql(`update cases set jury_invited_at = null where id='${c7}'`);
+ok((await J7.req(`/api/j/${jt7}/vote`, { method: "POST", json: { verdict: "both" } })).status === 409, "초대 전 투표 불가");
+ok((await J7.req(`/j/${jt7}`)).data.includes("배심원 모집 전"), "초대 전 배심원 페이지 닫힘");
+await P7.req(`/api/cases/${c7}/jury`, { method: "POST", json: {} });
+sql(`update cases set trial_started_at = now() - interval '7 days' where id='${c7}'`);
+await P7.req(`/api/cases/${c7}/trial?as=plaintiff`);
+ok(sql(`select judged_by from judgments where case_id='${c7}'`) === "judge", "0표로 마감 → AI 재판장 판결");
+
+console.log("\n[12] IP당 시간당 초안 10회");
 const P6 = new Jar("p6", "10.11.0.1");
 let last;
 for (let i = 0; i < 11; i++) last = await newCase(P6);

@@ -2,47 +2,152 @@
 
 @theme {
   --color-paper: #fbf8f1;
-  --color-paper-line: #e6dfcf;
+  --color-paper-2: #f3eee2;
+  --color-paper-line: #e2dacb;
+  --color-rule: #b9ae98;
   --color-ink: #1a1a1a;
+  --color-ink-blue: #1f2d5c;
   --color-muted: #6b6b6b;
   --color-seal: #c8102e;
-  --color-court: #14161c;
-  --color-court-2: #1f222b;
+  --color-redpen: #cf2a27;
+  --color-postit: #f5e27c;
+  --color-manila: #e3c98f;
+  --color-manila-2: #d6b878;
+  --color-wood: #5e4029;
+  --color-wood-dark: #2b1d13;
+  --color-mat: #2e4337;
+  --color-court: #1d120a;
+  --color-court-2: #2e1d11;
+  --color-brass: #c9a24a;
   --font-sans: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
   --font-serif: var(--font-noto-serif), "Noto Serif KR", "Nanum Myeongjo", serif;
+  --font-type: var(--font-typewriter), "Nanum Gothic Coding", ui-monospace, monospace;
+  --font-hand: var(--font-handwriting), "Nanum Pen Script", cursive;
 }
 
 html {
   -webkit-text-size-adjust: 100%;
+  overflow-x: clip;
 }
 
 body {
-  background: #fff;
+  background: var(--color-wood-dark);
   color: var(--color-ink);
   font-family: var(--font-sans);
   word-break: keep-all;
   overflow-wrap: anywhere;
+  overflow-x: clip;
 }
 
-/* 종이 질감: 미세 노이즈 */
 :root {
+  /* 종이 질감: 미세 노이즈 */
   --paper-noise: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.35 0 0 0 0 0.3 0 0 0 0 0.2 0 0 0 0.07 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+  /* 나뭇결: 가로로 길게 늘인 터뷸런스 */
+  --wood-grain: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='600' height='600'><filter id='w'><feTurbulence type='fractalNoise' baseFrequency='0.003 0.09' numOctaves='4' seed='7' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.16 0 0 0 0 0.09 0 0 0 0 0.04 0 0 0 0.55 0'/></filter><rect width='100%' height='100%' filter='url(%23w)'/></svg>");
+  /* 가죽 데스크매트: 잔 결 */
+  --leather: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='l'><feTurbulence type='turbulence' baseFrequency='0.5' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.12 0'/></filter><rect width='100%' height='100%' filter='url(%23l)'/></svg>");
   --fold-1: linear-gradient(to bottom, transparent calc(33.33% - 1px), rgb(0 0 0 / 0.06) calc(33.33% - 1px), rgb(255 255 255 / 0.7) 33.33%, transparent calc(33.33% + 3px));
   --fold-2: linear-gradient(to bottom, transparent calc(66.66% - 1px), rgb(0 0 0 / 0.06) calc(66.66% - 1px), rgb(255 255 255 / 0.7) 66.66%, transparent calc(66.66% + 3px));
+  --sheet-shadow: 0 1px 1px rgb(0 0 0 / 0.18), 0 6px 10px -4px rgb(0 0 0 / 0.35), 0 22px 40px -18px rgb(0 0 0 / 0.55);
 }
 
+@layer components {
+/* ── 책상 ─────────────────────────── */
+.desk-wood {
+  background-color: var(--color-wood);
+  background-image:
+    var(--wood-grain),
+    linear-gradient(90deg, rgb(0 0 0 / 0.18), transparent 18%, transparent 82%, rgb(0 0 0 / 0.18)),
+    linear-gradient(180deg, #6a4930, #563a25);
+  background-size: 600px 600px, 100% 100%, 100% 100%;
+}
+
+.desk-mat {
+  background-color: var(--color-mat);
+  background-image: var(--leather), radial-gradient(ellipse at 50% 30%, rgb(255 255 255 / 0.06), transparent 70%);
+  box-shadow:
+    inset 0 0 0 1px rgb(0 0 0 / 0.35),
+    inset 0 0 40px rgb(0 0 0 / 0.35),
+    0 2px 0 rgb(255 255 255 / 0.06),
+    0 10px 30px rgb(0 0 0 / 0.4);
+}
+
+/* 매트 가장자리 박음질 */
+.desk-mat::after {
+  content: "";
+  position: absolute;
+  inset: 7px;
+  border: 1.5px dashed rgb(220 210 180 / 0.28);
+  border-radius: 6px;
+  pointer-events: none;
+}
+
+/* 하단 손 닿는 곳: 책상 앞 모서리 */
+.desk-tray {
+  background:
+    linear-gradient(180deg, rgb(255 255 255 / 0.08), transparent 3px),
+    linear-gradient(180deg, #3a281b, #24180f);
+  box-shadow: 0 -10px 24px -10px rgb(0 0 0 / 0.6);
+}
+
+/* ── 종이 ─────────────────────────── */
 .paper {
   background-color: var(--color-paper);
   background-image: var(--paper-noise);
-  box-shadow:
-    0 1px 2px rgb(0 0 0 / 0.06),
-    0 8px 24px -12px rgb(0 0 0 / 0.12);
-  border: 1px solid var(--color-paper-line);
+  box-shadow: var(--sheet-shadow);
 }
 
-/* 접힌 자국 (3단) */
+.paper-2 {
+  background-color: var(--color-paper-2);
+  background-image: var(--paper-noise);
+  box-shadow: var(--sheet-shadow);
+}
+
 .paper.fold-lines {
   background-image: var(--fold-1), var(--fold-2), var(--paper-noise);
+}
+
+/* 손글씨 줄 칸 (line-height 와 맞춘다) */
+.ruled {
+  background-image: linear-gradient(to bottom, transparent calc(var(--lh, 2rem) - 1px), var(--color-rule) calc(var(--lh, 2rem) - 1px));
+  background-size: 100% var(--lh, 2rem);
+  background-attachment: local;
+  line-height: var(--lh, 2rem);
+}
+
+/* 포스트잇 */
+.postit {
+  background: linear-gradient(170deg, #f8e98f, var(--color-postit) 60%, #ecd665);
+  box-shadow: 0 1px 1px rgb(0 0 0 / 0.15), 4px 10px 14px -8px rgb(0 0 0 / 0.5);
+}
+
+/* 마닐라 서류철 */
+.manila {
+  background-color: var(--color-manila);
+  background-image: var(--paper-noise);
+  box-shadow: var(--sheet-shadow);
+}
+
+/* 고무도장 잉크 얼룩: 군데군데 덜 묻은 자리 */
+.stamp-ink {
+  -webkit-mask-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120'><filter id='s'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' seed='3' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 -2.4 0 0 0 2.15'/></filter><rect width='100%' height='100%' filter='url(%23s)'/></svg>");
+  mask-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120'><filter id='s'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' seed='3' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 -2.4 0 0 0 2.15'/></filter><rect width='100%' height='100%' filter='url(%23s)'/></svg>");
+}
+
+/* 절취선 */
+.perforation {
+  background-image: radial-gradient(circle at 4px 4px, var(--color-wood-dark) 2.5px, transparent 3px);
+  background-size: 12px 8px;
+  background-repeat: repeat-x;
+}
+
+/* 우편함 장면: 회벽 + 보도블록, 바닥 쪽이 가깝게 */
+.mailbox-scene {
+  background:
+    radial-gradient(ellipse 70% 40% at 50% 20%, rgb(255 246 225 / 0.7), transparent 70%),
+    linear-gradient(180deg, transparent 0 72%, rgb(0 0 0 / 0.18) 72% calc(72% + 2px), transparent calc(72% + 2px)),
+    repeating-linear-gradient(90deg, transparent 0 58px, rgb(0 0 0 / 0.08) 58px 60px) 0 72% / 100% 28% no-repeat,
+    linear-gradient(180deg, #e9e1d1 0%, #ddd2be 72%, #bfb096 72%, #a99a80 100%);
 }
 
 /* 컷인 집중선 */
@@ -50,10 +155,55 @@ body {
   background: repeating-conic-gradient(from 0deg at 50% 50%, #fff 0deg 2deg, #000 2deg 9deg);
 }
 
+/* ── 법정: 호두나무 벽 패널 + 위에서 내려오는 따뜻한 조명 ── */
 .court-bg {
+  background-color: #2a190f;
+  background-image:
+    radial-gradient(ellipse 90% 45% at 50% 0%, rgb(255 205 140 / 0.22), transparent 70%),
+    repeating-linear-gradient(90deg, rgb(0 0 0 / 0.32) 0 2px, rgb(255 255 255 / 0.05) 2px 3px, transparent 3px 120px),
+    linear-gradient(180deg, transparent 0 230px, rgb(0 0 0 / 0.35) 230px 233px, rgb(255 220 170 / 0.06) 233px 236px, transparent 236px),
+    var(--wood-grain),
+    linear-gradient(180deg, #4b2f1c 0%, #33200f 45%, #1f130a 100%);
+  background-size: auto, auto, auto, 600px 600px, auto;
+  background-attachment: fixed;
+}
+
+/* 재판장 의자 등받이 (버건디 가죽 + 단추) */
+.court-chair {
   background:
-    radial-gradient(ellipse at 50% -10%, rgb(200 16 46 / 0.18), transparent 60%),
-    linear-gradient(180deg, #1b1e26 0%, #101217 100%);
+    radial-gradient(circle at 50% 30%, rgb(0 0 0 / 0.35) 2px, transparent 3px) 0 0 / 18px 18px,
+    linear-gradient(180deg, #7a1f24, #4a0f14);
+  box-shadow: inset 0 0 0 3px #3a0a0e, inset 0 8px 14px rgb(255 255 255 / 0.12), 0 6px 16px rgb(0 0 0 / 0.5);
+}
+
+/* 법대·진술대 앞판 */
+.court-bench,
+.court-stand {
+  background:
+    linear-gradient(180deg, #a87a4d 0 4px, #5a361d 4px 6px, transparent 6px),
+    repeating-linear-gradient(90deg, rgb(0 0 0 / 0.16) 0 1px, transparent 1px 34px),
+    var(--wood-grain),
+    linear-gradient(180deg, #7b5032, #4a2c17);
+  background-size: auto, auto, 600px 600px, auto;
+  box-shadow: 0 10px 18px -6px rgb(0 0 0 / 0.7), inset 0 -3px 0 rgb(0 0 0 / 0.3);
+}
+.court-bench {
+  border-radius: 3px 3px 0 0;
+}
+
+/* 놋쇠 명패 */
+.brass-plate {
+  background: linear-gradient(180deg, #f3dc95, #c9a24a 55%, #9c7a2c);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.6), 0 1px 2px rgb(0 0 0 / 0.6);
+}
+
+/* 대사창: 먹색 판 + 놋쇠 이중 테 */
+.court-dialog {
+  background: linear-gradient(180deg, rgb(20 12 6 / 0.92), rgb(12 7 3 / 0.95));
+  border: 2px solid #c9a24a;
+  box-shadow: 0 0 0 3px #1a0f07, 0 0 0 4px rgb(201 162 74 / 0.5), 0 12px 24px rgb(0 0 0 / 0.5);
+}
+
 }
 
 .no-scrollbar::-webkit-scrollbar {

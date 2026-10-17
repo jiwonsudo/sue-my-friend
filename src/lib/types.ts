@@ -37,6 +37,7 @@ export type CaseRow = {
   response_deadline_at: string | null;
   trial_started_at: string | null;
   voting_deadline_at: string | null;
+  jury_invited_at: string | null;
   defendant_response: "accept" | "object" | "countersue" | "ignore" | null;
   regen_count: number;
   token_salt: string;
@@ -76,6 +77,7 @@ export type JudgmentRow = {
   verdict: Verdict;
   order_text: string;
   reason_text: string;
+  judged_by: "system" | "jury" | "judge";
   execution_proof_path: string | null;
   executed_at: string | null;
   created_at: string;
@@ -98,5 +100,6 @@ export type TrialView = {
   evidence: PublicEvidence[];
   current: (TrialSlot & { deadline: string }) | null;
   votingDeadline: string | null;
+  juryInvited: boolean;
   votes: { plaintiff: number; defendant: number; both: number };
 };

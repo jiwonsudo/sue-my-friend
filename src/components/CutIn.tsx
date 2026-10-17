@@ -33,7 +33,7 @@ export function CutIn({ line, by, onDone }: { line: string; by: string; onDone: 
         animate={{ scale: 1, opacity: 1 }}
         transition={{ type: "spring", stiffness: 420, damping: 16, delay: 0.08 }}
       >
-        <p className="mb-1 text-sm font-bold text-white/80">{by}</p>
+        <p className="mb-1 font-type text-[13px] font-bold text-white/80">{by}</p>
         <p className="text-[34px] leading-tight font-black tracking-tight text-white [text-shadow:3px_3px_0_#000]">{line}</p>
       </motion.div>
     </motion.div>

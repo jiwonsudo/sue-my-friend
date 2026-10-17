@@ -5,6 +5,7 @@ import { mostRebutted, TRIAL_SLOTS } from "@/lib/trial";
 import type { CaseRow, JudgmentRow, StatementRow, Verdict } from "@/lib/types";
 import { db } from "./supabase";
 import { fail } from "./http";
+import { aiRuling } from "./judge";
 import { deriveToken, hashToken } from "./tokens";
 
 export async function fetchCase(id: string): Promise<CaseRow | null> {
@@ -50,7 +51,7 @@ export async function tallyVotes(caseId: string) {
 
 /** 상태가 바뀌었으면 true */
 async function advance(c: CaseRow, now = Date.now()): Promise<boolean> {
-  // 24시간 무응답 → 궐석 판결
+  // 답변 기한 무응답 → 궐석 판결
   if (
     (c.status === "sent" || c.status === "opened") &&
     !c.defendant_response &&
@@ -92,7 +93,7 @@ async function advance(c: CaseRow, now = Date.now()): Promise<boolean> {
     }
     const count = changed ? (await fetchStatements(c.id)).length : statements.length;
     if (count >= TRIAL_SLOTS.length) {
-      await startVoting(c.id, new Date(new Date(last).getTime() + VOTING_WINDOW_MS));
+      await finishTrial(c, new Date(last));
       changed = true;
     }
     if (changed) {
@@ -105,12 +106,35 @@ async function advance(c: CaseRow, now = Date.now()): Promise<boolean> {
   if (c.status === "voting" && c.voting_deadline_at && now > new Date(c.voting_deadline_at).getTime()) {
     const t = await tallyVotes(c.id);
     const max = Math.max(t.plaintiff, t.defendant, t.both);
+    // 배심원을 불렀는데 아무도 오지 않았으면 AI 재판장이 판결
+    if (max === 0) {
+      await judgeByAi(c);
+      return true;
+    }
     const winners = (Object.keys(t) as (keyof typeof t)[]).filter((k) => t[k] === max);
-    const verdict: Verdict = max === 0 || winners.length > 1 ? "both" : winners[0];
-    await createJudgment(c, verdict, t);
+    const verdict: Verdict = winners.length > 1 ? "both" : winners[0];
+    await createJudgment(c, verdict, { votes: t });
     return true;
   }
   return false;
+}
+
+/**
+ * 공방 6턴이 모두 끝났을 때: 배심원을 초대했으면 투표, 아니면 AI 재판장이 바로 판결.
+ * endedAt 은 마지막 진술 시각 (투표 마감 기준).
+ */
+export async function finishTrial(c: CaseRow, endedAt: Date) {
+  const fresh = (await fetchCase(c.id)) ?? c;
+  if (fresh.status !== "trial") return;
+  if (fresh.jury_invited_at) await startVoting(c.id, new Date(endedAt.getTime() + VOTING_WINDOW_MS));
+  else await judgeByAi(fresh);
+}
+
+async function judgeByAi(c: CaseRow) {
+  // 이미 판결이 있으면 다시 부르지 않는다 (동시 요청)
+  if (await fetchJudgment(c.id)) return;
+  const ruling = await aiRuling(c, await fetchStatements(c.id));
+  await createJudgment(c, ruling.verdict, { reason: ruling.reason, judgedBy: "judge" });
 }
 
 export async function startVoting(caseId: string, deadline: Date) {
@@ -124,10 +148,14 @@ export async function startVoting(caseId: string, deadline: Date) {
 export async function createJudgment(
   c: CaseRow,
   verdict: Verdict,
-  votes?: { plaintiff: number; defendant: number; both: number },
+  opts: { votes?: { plaintiff: number; defendant: number; both: number }; reason?: string; judgedBy?: JudgmentRow["judged_by"] } = {},
 ) {
+  const votes = opts.votes;
+  const judgedBy = opts.judgedBy ?? (votes ? "jury" : "system");
   let reason: string;
-  if (verdict === "settled") {
+  if (opts.reason) {
+    reason = opts.reason;
+  } else if (verdict === "settled") {
     reason = "피고는 통고서를 열람한 후 다툼 없이 원고의 청구를 받아들였다. 본 법정은 피고의 빠른 판단을 높이 평가한다.";
   } else if (verdict === "default") {
     reason = "피고는 답변 기한 내에 아무런 대응을 하지 아니하였다. 본 법정은 피고의 침묵을 청구의 자백으로 본다.";
@@ -144,7 +172,7 @@ export async function createJudgment(
   await db()
     .from("judgments")
     .upsert(
-      { case_id: c.id, verdict, order_text: orderText(verdict, c.demand), reason_text: reason },
+      { case_id: c.id, verdict, order_text: orderText(verdict, c.demand), reason_text: reason, judged_by: judgedBy },
       { onConflict: "case_id", ignoreDuplicates: true },
     );
   await db().from("cases").update({ status: "judged" }).eq("id", c.id).not("status", "in", "(judged,executed,dismissed)");

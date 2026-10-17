@@ -43,7 +43,7 @@ export function fillPlaceholders(text: string, c: DocCase, now = new Date()): st
   const ref = c.sent_at ? new Date(c.sent_at) : now;
   const deadline = c.response_deadline_at
     ? `${formatDateTime(c.response_deadline_at)}까지`
-    : "본 서면 수령 후 24시간 이내";
+    : "본 서면 수령 후 12시간 이내";
   return text
     .replaceAll("{{사건일}}", formatDate(c.incident_date))
     .replaceAll("{{경과기간}}", elapsedLabel(c.incident_date, ref))

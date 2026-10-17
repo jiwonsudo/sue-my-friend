@@ -41,25 +41,25 @@ export function JuryVote(p: {
     }
   };
 
-  const btn = "min-h-14 rounded-xl px-2 text-[15px] font-bold disabled:opacity-40";
+  const btn = "min-h-14 px-2 font-serif text-[15px] font-bold disabled:opacity-40 active:translate-y-px";
   return (
-    <div className="fixed inset-x-0 bottom-0 z-20 border-t border-white/10 bg-court/95 px-4 pt-3 pb-[max(12px,env(safe-area-inset-bottom))] backdrop-blur">
+    <div className="fixed inset-x-0 bottom-0 z-20 border-t border-white/15 bg-court px-4 pt-3 pb-[max(12px,env(safe-area-inset-bottom))]">
       <div className="mx-auto max-w-md space-y-3">
         {p.verdictHref ? (
-          <Link href={p.verdictHref} className="flex min-h-14 items-center justify-center rounded-2xl bg-seal font-bold">
-            판결 보기
+          <Link href={p.verdictHref} className="flex min-h-14 items-center justify-center bg-seal font-serif text-[16px] font-bold">
+            판결문 보기
           </Link>
         ) : !p.open ? (
-          <p className="py-2 text-center text-sm text-white/60">투표가 열려 있지 않습니다.</p>
+          <p className="py-2 text-center font-type text-[13px] text-white/60">투표 기간 아님.</p>
         ) : voted || p.isParty ? (
           <>
-            {p.isParty && !voted && <p className="text-center text-xs text-white/50">당사자는 투표할 수 없어요. 현재 득표만 보여드려요.</p>}
+            {p.isParty && !voted && <p className="text-center font-type text-[11.5px] text-white/50">당사자는 투표 불가. 현재 득표만 표시.</p>}
             <VoteBars votes={votes} total={total} plaintiff={p.plaintiff} defendant={p.defendant} />
           </>
         ) : (
           <>
-            <p className="text-center text-sm">
-              당신의 판단은?{" "}
+            <p className="text-center font-type text-[13px]">
+              평결 1인 1표{" "}
               {p.deadline && (
                 <span className="text-white/60">
                   · 마감 <Countdown deadline={p.deadline} format="hm" />
@@ -67,10 +67,10 @@ export function JuryVote(p: {
               )}
             </p>
             <div className="grid grid-cols-3 gap-2">
-              <button disabled={busy} onClick={() => vote("plaintiff")} className={`${btn} bg-white text-ink`}>
+              <button disabled={busy} onClick={() => vote("plaintiff")} className={`${btn} bg-paper text-ink`}>
                 원고 승
               </button>
-              <button disabled={busy} onClick={() => vote("both")} className={`${btn} border border-white/30`}>
+              <button disabled={busy} onClick={() => vote("both")} className={`${btn} border border-white/35`}>
                 쌍방 과실
               </button>
               <button disabled={busy} onClick={() => vote("defendant")} className={`${btn} bg-seal`}>

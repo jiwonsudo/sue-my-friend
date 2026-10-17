@@ -26,8 +26,8 @@ export function TrialClient({
   canSwitch,
 }: {
   initial: TrialView;
-  juryLink: string;
-  juryImage: string;
+  juryLink: string | null;
+  juryImage: string | null;
   canSwitch: boolean;
 }) {
   const router = useRouter();
@@ -37,6 +37,11 @@ export function TrialClient({
   const [muted, setMutedState] = useState(false);
   const [zoom, setZoom] = useState<PublicEvidence | null>(null);
   const [showJury, setShowJury] = useState(false);
+  const [jury, setJury] = useState<{ link: string; image: string } | null>(juryLink && juryImage ? { link: juryLink, image: juryImage } : null);
+  const [inviting, setInviting] = useState(false);
+  const [inviteError, setInviteError] = useState<string | null>(null);
+
+
   const logEnd = useRef<HTMLDivElement>(null);
 
   const nick = useCallback((r: Role) => (r === "plaintiff" ? view.plaintiffNick : view.defendantNick), [view]);
@@ -49,6 +54,20 @@ export function TrialClient({
     } catch {}
   }, [view.caseId, me, router]);
 
+  const invite = async () => {
+    setInviting(true);
+    setInviteError(null);
+    try {
+      const r = await api<{ jury: string }>(`/api/cases/${view.caseId}/jury`, { json: {} });
+      setJury({ link: r.jury, image: `${new URL(r.jury).origin}/api/og/jury/${r.jury.split("/j/")[1]}` });
+      setShowJury(true);
+      refresh();
+    } catch (e) {
+      setInviteError(e instanceof Error ? e.message : "초대 실패");
+    } finally {
+      setInviting(false);
+    }
+  };
   useEffect(() => {
     setMutedState(isMuted());
     const t = setInterval(() => document.visibilityState === "visible" && refresh(), POLL_MS);
@@ -96,50 +115,62 @@ export function TrialClient({
   return (
     <div className="court-bg min-h-dvh text-white">
       <Header
-        dark
+
         right={
           <div className="flex items-center gap-1">
             {canSwitch && (
-              <Link href={`?as=${otherRole(me)}`} onClick={() => setTimeout(() => location.reload(), 50)} className="min-h-11 px-2 py-3 text-xs text-white/50">
-                {ROLE_LABEL[otherRole(me)]}로 보기
+              <Link href={`?as=${otherRole(me)}`} onClick={() => setTimeout(() => location.reload(), 50)} className="min-h-11 px-2 py-3 font-type text-[11px] text-white/50">
+                {ROLE_LABEL[otherRole(me)]} 시점
               </Link>
             )}
             <button
               type="button"
               aria-label={muted ? "소리 켜기" : "소리 끄기"}
-              className="grid min-h-11 min-w-11 place-items-center text-lg"
+              aria-pressed={!muted}
+              className="grid min-h-11 min-w-11 place-items-center text-white/70"
               onClick={() => {
                 setMuted(!muted);
                 setMutedState(!muted);
               }}
             >
-              {muted ? "🔇" : "🔊"}
+              <SpeakerIcon muted={muted} />
             </button>
           </div>
         }
       />
 
       <div className="mx-auto max-w-md px-4 pb-[22rem]">
-        <p className="pt-3 text-center text-xs tracking-wider text-white/40">
-          {view.caseNo} · {view.title}
+        <p className="pt-3 font-type text-[11px] text-white/40">
+          {view.caseNo} <span className="text-white/25">|</span> {view.title}
         </p>
 
-        {/* 무대 */}
-        <div className="mt-3 grid grid-cols-3 items-end gap-2 text-center">
-          <Figure label="원고" name={view.plaintiffNick} active={speaker === "plaintiff"} me={me === "plaintiff"}>
-            <PlaintiffAvatar size={76} />
-          </Figure>
-          <Figure label="재판장" name="" active={speaker === "judge"} raised>
-            <JudgeAvatar size={84} />
-          </Figure>
-          <Figure label="피고" name={view.defendantNick} active={speaker === "defendant"} me={me === "defendant"} flip>
-            <DefendantAvatar size={76} />
-          </Figure>
+        {/* 법정: 높은 법대 위 재판장, 아래 양쪽 진술대 */}
+        <div className="relative mt-3">
+          {/* 재판장석 */}
+          <div className="relative mx-auto flex w-[72%] flex-col items-center">
+            <Spot on={speaker === "judge"} />
+            <div className="court-chair absolute top-0 h-[104px] w-[92px] rounded-t-[46px]" />
+            <motion.div className="relative z-10 pt-4" animate={{ scale: speaker === "judge" ? 1.05 : 1 }}>
+              <JudgeAvatar size={84} className="text-[#0b0b0d] drop-shadow-[0_0_1px_rgb(255_230_190/0.5)]" />
+            </motion.div>
+            <div className="court-bench relative z-20 -mt-6 flex h-12 w-full items-center justify-center">
+              <Plate>재판장</Plate>
+            </div>
+          </div>
+          {/* 진술대 */}
+          <div className="-mt-1 grid grid-cols-2 gap-12 px-1">
+            <Stand label="원고" name={view.plaintiffNick} active={speaker === "plaintiff"} me={me === "plaintiff"}>
+              <PlaintiffAvatar size={86} />
+            </Stand>
+            <Stand label="피고" name={view.defendantNick} active={speaker === "defendant"} me={me === "defendant"} flip>
+              <DefendantAvatar size={86} />
+            </Stand>
+          </div>
         </div>
 
         {/* 대사창 */}
-        <div className="mt-4 min-h-28 rounded-xl border-2 border-white/80 bg-black/70 p-4 shadow-[0_0_0_4px_rgba(0,0,0,0.6)]">
-          <p className="mb-1 text-xs font-bold text-seal">
+        <div className="court-dialog mt-4 min-h-28 p-4">
+          <p className="mb-1 font-type text-[12px] font-bold text-brass">
             {speaker === "judge" ? "재판장" : `${ROLE_LABEL[speaker]} ${nick(speaker)}`}
           </p>
           <p className="text-[16px] leading-relaxed">
@@ -148,9 +179,11 @@ export function TrialClient({
         </div>
 
         {/* 기록 */}
-        <section className="mt-6 space-y-3">
-          <p className="text-xs font-semibold tracking-wider text-white/40">공방 기록</p>
-          {view.statements.length === 0 && <p className="text-sm text-white/40">아직 진술이 없습니다.</p>}
+        <section className="mt-7">
+          <p className="mb-1 flex items-baseline justify-between border-b border-white/25 pb-1.5 font-serif text-[15px] font-bold tracking-[0.3em] text-white/80">
+            공판조서 <span className="font-type text-[11px] font-normal tracking-normal text-white/40">{view.statements.length}/6</span>
+          </p>
+          {view.statements.length === 0 && <p className="py-3 font-type text-[13px] text-white/40">진술 없음.</p>}
           {view.statements.map((s) => (
             <StatementCard key={s.id} s={s} all={view.statements} nick={nick} evidence={evidenceById} onZoom={setZoom} />
           ))}
@@ -159,33 +192,52 @@ export function TrialClient({
       </div>
 
       {/* 하단 액션 */}
-      <div className="fixed inset-x-0 bottom-0 z-20 max-h-[62dvh] overflow-y-auto border-t border-white/10 bg-court/95 px-4 pt-3 pb-[max(12px,env(safe-area-inset-bottom))] backdrop-blur">
+      <div className="fixed inset-x-0 bottom-0 z-20 max-h-[64dvh] overflow-y-auto border-t border-white/15 bg-court px-4 pt-3 pb-[max(12px,env(safe-area-inset-bottom))]">
         <div className="mx-auto max-w-md">
           {view.status === "voting" ? (
             <VotingPanel view={view} />
           ) : myTurn && view.current ? (
             <Compose view={view} me={me} onDone={refresh} />
           ) : view.current ? (
-            <p className="py-3 text-center text-sm text-white/70">
-              상대의 {KIND_LABEL[view.current.kind]}을 기다리는 중 · 남은 시간{" "}
+            <p className="py-3 text-center font-type text-[13px] text-white/70">
+              상대 {KIND_LABEL[view.current.kind]} 대기 · 남은 시간{" "}
               <Countdown deadline={view.current.deadline} format="hm" className="font-bold text-white" />
             </p>
           ) : null}
-          <button type="button" onClick={() => setShowJury((v) => !v)} className="mt-2 min-h-11 w-full rounded-xl border border-white/20 text-sm font-semibold">
-            배심원 모집
-          </button>
-          {showJury && (
-            <div className="mt-2 text-ink">
-              <ShareButtons
-                compact
-                url={juryLink}
-                title={`${view.title} — 배심원을 모집합니다`}
-                text="공방을 읽고 누가 맞는지 판단해주세요."
-                imageUrl={juryImage}
-                buttonLabel="배심원 참여"
-              />
+          {jury ? (
+            <>
+              <button
+                type="button"
+                onClick={() => setShowJury((v) => !v)}
+                aria-expanded={showJury}
+                className="mt-2 min-h-11 w-full border border-white/25 font-serif text-[14px] font-bold"
+              >
+                배심원 모집 링크 {showJury ? "닫기" : "보기"}
+              </button>
+              {showJury && (
+                <div className="mt-2">
+                  <ShareButtons
+                    compact
+                    url={jury.link}
+                    title={`${view.title} — 배심원을 모집합니다`}
+                    text="공방 기록을 읽고 원고 승·피고 승·쌍방 과실 중 하나에 투표."
+                    imageUrl={jury.image}
+                    buttonLabel="배심원 참여"
+                  />
+                </div>
+              )}
+            </>
+          ) : view.status === "trial" ? (
+            <div className="mt-2 border-t border-dashed border-white/15 pt-2">
+              <button type="button" disabled={inviting} onClick={invite} className="min-h-11 w-full border border-white/25 font-serif text-[14px] font-bold disabled:opacity-40">
+                배심원 초대
+              </button>
+              <p className="mt-1.5 text-center font-type text-[11px] leading-relaxed text-white/45">
+                미초대 시 공방 종료 즉시 AI 재판장이 양측 진술로 판결함.
+              </p>
+              {inviteError && <p className="text-center text-sm text-red-300">{inviteError}</p>}
             </div>
-          )}
+          ) : null}
         </div>
       </div>
 
@@ -213,12 +265,34 @@ export function TrialClient({
   );
 }
 
-function Figure({
+/** 화자에게 떨어지는 조명 */
+function Spot({ on }: { on: boolean }) {
+  return (
+    <motion.div
+      aria-hidden
+      className="pointer-events-none absolute -inset-x-6 -top-6 bottom-0 bg-[radial-gradient(ellipse_at_50%_35%,rgb(255_214_150/0.35),transparent_65%)]"
+      initial={false}
+      animate={{ opacity: on ? 1 : 0 }}
+      transition={{ duration: 0.4 }}
+    />
+  );
+}
+
+/** 놋쇠 명패 */
+function Plate({ children }: { children: React.ReactNode }) {
+  return (
+    <span className="brass-plate inline-block px-2.5 py-0.5 font-serif text-[11.5px] font-bold tracking-[0.2em] whitespace-nowrap text-[#2a1a0c]">
+      {children}
+    </span>
+  );
+}
+
+/** 원고·피고 진술대 */
+function Stand({
   label,
   name,
   active,
   me,
-  raised,
   flip,
   children,
 }: {
@@ -226,19 +300,25 @@ function Figure({
   name: string;
   active: boolean;
   me?: boolean;
-  raised?: boolean;
   flip?: boolean;
   children: React.ReactNode;
 }) {
   return (
-    <motion.div animate={{ scale: active ? 1.06 : 1, opacity: active ? 1 : 0.55 }} className={raised ? "-translate-y-3" : ""}>
-      <div className={`mx-auto w-fit ${active ? "text-white" : "text-white/70"} ${flip ? "-scale-x-100" : ""}`}>{children}</div>
-      <div className={`mx-auto mt-1 w-fit rounded px-2 py-0.5 text-[11px] font-bold ${raised ? "bg-seal" : "bg-white/10"}`}>
-        {label}
-        {name && ` ${name}`}
-        {me && <span className="ml-1 text-white/50">(나)</span>}
+    <div className="relative flex flex-col items-center">
+      <Spot on={active} />
+      <motion.div
+        className={`relative z-10 ${flip ? "-scale-x-100" : ""} ${active ? "text-[#f1e4cc]" : "text-[#b9a68a]"}`}
+        animate={{ y: active ? -3 : 0, opacity: active ? 1 : 0.75 }}
+      >
+        {children}
+      </motion.div>
+      <div className="court-stand relative z-20 -mt-7 flex h-11 w-full items-center justify-center px-1">
+        <Plate>
+          {label} {name}
+          {me && <span className="ml-1 font-type text-[10px] tracking-normal text-[#5a3a14]">(나)</span>}
+        </Plate>
       </div>
-    </motion.div>
+    </div>
   );
 }
 
@@ -259,12 +339,18 @@ function StatementCard({
   const card = DEFENSE_CARDS.find((c) => c.id === s.card_id);
   const ev = s.evidence_id ? evidence.get(s.evidence_id) : null;
   return (
-    <div className={`rounded-xl p-3 ${s.role === "plaintiff" ? "mr-6 bg-white/[0.06]" : "ml-6 bg-seal/15"}`}>
-      <p className="mb-1 text-[11px] font-bold text-white/50">
-        {s.round}R · {ROLE_LABEL[s.role]} {nick(s.role)} · {KIND_LABEL[s.kind]}
+    <div className={`grid grid-cols-[3.2rem_1fr] gap-x-3 border-b border-white/10 py-3 ${s.role === "defendant" ? "bg-seal/[0.07]" : ""}`}>
+      <p className="pt-0.5 pl-1 font-type text-[11px] leading-tight text-white/45">
+        {s.round}R
+        <br />
+        <span className={s.role === "plaintiff" ? "text-white/80" : "text-[#ff8f8f]"}>{ROLE_LABEL[s.role]}</span>
+        <br />
+        {KIND_LABEL[s.kind]}
       </p>
+      <div>
+      <p className="mb-1 font-type text-[11px] text-white/40">{nick(s.role)}</p>
       {s.forfeited ? (
-        <p className="text-sm text-white/40 italic">진술 포기 (기한 초과)</p>
+        <p className="font-type text-[13px] text-white/40">진술 포기 (기한 초과)</p>
       ) : (
         <>
           {target && s.target_sentence_idx != null && (
@@ -277,9 +363,9 @@ function StatementCard({
           </ol>
           {(card || ev) && (
             <div className="mt-2 flex flex-wrap gap-2">
-              {card && <span className="rounded border border-amber-300/60 px-2 py-1 text-[12px] text-amber-200">항변: {card.name}</span>}
+              {card && <span className="border border-amber-300/60 px-2 py-1 font-type text-[11.5px] text-amber-200">항변 {card.name}</span>}
               {ev && (
-                <button type="button" onClick={() => onZoom(ev)} className="flex items-center gap-1.5 rounded border border-white/30 px-2 py-1 text-[12px]">
+                <button type="button" onClick={() => onZoom(ev)} className="flex min-h-9 items-center gap-1.5 border border-white/30 px-2 py-1 font-type text-[11.5px]">
                   {ev.url && (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={ev.url} alt="" className="h-6 w-6 rounded object-cover" />
@@ -291,6 +377,7 @@ function StatementCard({
           )}
         </>
       )}
+      </div>
     </div>
   );
 }
@@ -309,7 +396,7 @@ function Compose({ view, me, onDone }: { view: TrialView; me: Role; onDone: () =
   const filled = lines.map((l) => l.trim()).filter(Boolean);
 
   const upload = async (file: File) => {
-    if (file.size > LIMITS.evidenceBytes) return setError("5MB 이하 이미지만 올릴 수 있어요.");
+    if (file.size > LIMITS.evidenceBytes) return setError("5MB 이하 이미지만 첨부 가능.");
     setBusy(true);
     setError(null);
     try {
@@ -351,24 +438,24 @@ function Compose({ view, me, onDone }: { view: TrialView; me: Role; onDone: () =
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <p className="text-sm font-bold">
+        <p className="font-serif text-[15px] font-bold">
           내 차례 · {slot.round}라운드 {label}
         </p>
-        <p className="text-xs text-white/60">
+        <p className="font-type text-[12px] text-white/60">
           남은 시간 <Countdown deadline={slot.deadline} format="hm" />
         </p>
       </div>
 
       {needsTarget && target && (
         <div>
-          <p className="mb-1.5 text-xs text-white/60">반박할 문장을 탭하세요</p>
+          <p className="mb-1.5 font-type text-[12px] text-white/60">반박할 문장 선택</p>
           <div className="space-y-1.5">
             {target.sentences.map((t, i) => (
               <button
                 key={i}
                 type="button"
                 onClick={() => setTargetIdx(i)}
-                className={`block min-h-11 w-full rounded-lg border px-3 py-2 text-left text-[14px] ${
+                className={`block min-h-11 w-full border px-3 py-2 text-left text-[14px] ${
                   targetIdx === i ? "border-seal bg-seal/25" : "border-white/15 bg-white/5"
                 }`}
               >
@@ -385,27 +472,27 @@ function Compose({ view, me, onDone }: { view: TrialView; me: Role; onDone: () =
           value={l}
           maxLength={LIMITS.sentence}
           onChange={(e) => setLines(lines.map((x, j) => (j === i ? e.target.value : x)))}
-          placeholder={slot.kind === "testimony" ? `${i + 1}번째 문장` : slot.kind === "rebuttal" ? "그 말은 사실이 아닙니다…" : "마지막으로 한마디"}
-          className="min-h-12 w-full rounded-xl border border-white/15 bg-white/5 px-3 text-[16px] outline-none placeholder:text-white/30 focus:border-white/50"
+          placeholder={slot.kind === "testimony" ? `${i + 1}번째 문장` : slot.kind === "rebuttal" ? "반박 한 문장" : "최후진술 한 문장"}
+          className="min-h-12 w-full border-b border-white/30 bg-transparent px-1 text-[16px] outline-none placeholder:text-white/30 focus:border-white/80"
         />
       ))}
       {lines.length < max && (
-        <button type="button" className="text-xs text-white/60 underline" onClick={() => setLines([...lines, ""])}>
-          + 문장 추가 ({lines.length}/{max})
+        <button type="button" className="min-h-11 font-type text-[12px] text-white/60 underline" onClick={() => setLines([...lines, ""])}>
+          문장 추가 ({lines.length}/{max})
         </button>
       )}
 
       {slot.kind === "rebuttal" && (
         <>
           <div>
-            <p className="mb-1.5 text-xs text-white/60">항변 카드 (선택)</p>
+            <p className="mb-1.5 font-type text-[12px] text-white/60">항변 카드 (선택)</p>
             <div className="no-scrollbar -mx-4 flex gap-2 overflow-x-auto px-4">
               {DEFENSE_CARDS.map((c) => (
                 <button
                   key={c.id}
                   type="button"
                   onClick={() => setCardId(cardId === c.id ? null : c.id)}
-                  className={`min-h-16 w-28 shrink-0 rounded-lg border-2 p-2 text-left text-[12px] font-bold ${
+                  className={`min-h-16 w-28 shrink-0 border p-2 text-left font-serif text-[12.5px] font-bold ${
                     cardId === c.id ? "border-amber-300 bg-amber-300/15 text-amber-100" : "border-white/15 bg-white/5"
                   }`}
                 >
@@ -414,7 +501,7 @@ function Compose({ view, me, onDone }: { view: TrialView; me: Role; onDone: () =
               ))}
             </div>
             {cardId && (
-              <div className="mt-2 rounded-lg bg-amber-100 p-3 text-[12px] text-ink">
+              <div className="mt-2 bg-amber-100 p-3 text-[12px] text-ink">
                 <p>{DEFENSE_CARDS.find((c) => c.id === cardId)!.desc}</p>
                 <p className="mt-1 text-[10px] text-black/50">{CARD_NOTICE}</p>
               </div>
@@ -425,13 +512,13 @@ function Compose({ view, me, onDone }: { view: TrialView; me: Role; onDone: () =
               <>
                 {ev.url && (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={ev.url} alt="" className="h-11 w-11 rounded object-cover" />
+                  <img src={ev.url} alt="" className="h-11 w-11 object-cover" />
                 )}
                 <input
                   defaultValue={ev.label}
                   maxLength={LIMITS.label}
                   onBlur={(e) => rename(e.target.value)}
-                  className="min-h-11 flex-1 rounded-lg border border-white/15 bg-white/5 px-3 text-[14px]"
+                  className="min-h-11 flex-1 border-b border-white/30 bg-transparent px-1 font-type text-[14px]"
                   aria-label="증거 이름"
                 />
                 <button type="button" className="min-h-11 px-2 text-xs text-white/60" onClick={() => setEv(null)}>
@@ -439,8 +526,8 @@ function Compose({ view, me, onDone }: { view: TrialView; me: Role; onDone: () =
                 </button>
               </>
             ) : (
-              <label className="flex min-h-11 cursor-pointer items-center rounded-lg border border-dashed border-white/25 px-3 text-sm text-white/70">
-                + 증거 사진 (선택, 5MB)
+              <label className="flex min-h-11 cursor-pointer items-center border border-dashed border-white/25 px-3 font-type text-[12.5px] text-white/70">
+                증거 사진 첨부 (선택, 5MB 이하)
                 <input type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files?.[0] && upload(e.target.files[0])} />
               </label>
             )}
@@ -453,9 +540,9 @@ function Compose({ view, me, onDone }: { view: TrialView; me: Role; onDone: () =
         type="button"
         disabled={busy || filled.length === 0 || (needsTarget && targetIdx == null)}
         onClick={submit}
-        className="min-h-14 w-full rounded-2xl bg-seal text-[17px] font-bold disabled:opacity-40"
+        className="min-h-14 w-full bg-seal font-serif text-[18px] font-black tracking-[0.06em] shadow-[inset_0_-3px_0_rgb(0_0_0/0.25)] disabled:opacity-40"
       >
-        {busy ? "제출 중…" : slot.kind === "rebuttal" ? "이의 있음!" : `${label} 제출`}
+        {busy ? "제출 중" : slot.kind === "rebuttal" ? "이의 있음!" : `${label} 제출`}
       </button>
     </div>
   );
@@ -465,10 +552,23 @@ function VotingPanel({ view }: { view: TrialView }) {
   const total = view.votes.plaintiff + view.votes.defendant + view.votes.both;
   return (
     <div className="space-y-2 py-1">
-      <p className="text-center text-sm">
-        배심원 투표 중 · 마감까지 <Countdown deadline={view.votingDeadline} format="hm" className="font-bold" />
+      <p className="text-center font-type text-[13px]">
+        배심원 평의 중 · 마감까지 <Countdown deadline={view.votingDeadline} format="hm" className="font-bold" />
       </p>
       <VoteBars votes={view.votes} total={total} plaintiff={view.plaintiffNick} defendant={view.defendantNick} />
     </div>
+  );
+}
+
+function SpeakerIcon({ muted }: { muted: boolean }) {
+  return (
+    <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden>
+      <path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" strokeLinejoin="round" />
+      {muted ? (
+        <path d="M16 9.5l5 5M21 9.5l-5 5" strokeLinecap="round" />
+      ) : (
+        <path d="M15.5 9c1 .8 1.5 1.8 1.5 3s-.5 2.2-1.5 3M18 6.5c1.8 1.4 2.8 3.3 2.8 5.5s-1 4.1-2.8 5.5" strokeLinecap="round" />
+      )}
+    </svg>
   );
 }
