@@ -39,7 +39,7 @@ export const POST = handle(async (req) => {
     if (c.status !== "draft") fail(409, "이미 발송된 사건입니다.");
     if (c.regen_count >= LIMITS.maxRegen) fail(429, "재생성은 사건당 3번까지예요.");
     await rateLimit(clientIp(req));
-    const draft = await generateDraft(c, tone, c.draft);
+    const { draft } = await generateDraft(c, tone, c.draft, { spentUsd: Number(c.ai_cost_usd), caseId: c.id });
     const { data } = await db()
       .from("cases")
       .update({ draft, regen_count: c.regen_count + 1 })
@@ -53,13 +53,13 @@ export const POST = handle(async (req) => {
   // 최초 생성: 초안이 성공한 뒤에 사건을 만든다
   const input = { ...body.input, type: body.input.type as CaseType };
   await rateLimit(clientIp(req));
-  const draft = await generateDraft(input, tone, null);
+  const { draft, costUsd } = await generateDraft(input, tone, null);
 
   const { data: caseNo, error: noErr } = await db().rpc("next_case_no");
   if (noErr || !caseNo) throw new Error("case_no");
   const { data: created, error } = await db()
     .from("cases")
-    .insert({ ...input, case_no: caseNo, draft, status: "draft" })
+    .insert({ ...input, case_no: caseNo, draft, status: "draft", ai_cost_usd: Number(costUsd.toFixed(6)) })
     .select("*")
     .single();
   if (error || !created) throw new Error("case insert");

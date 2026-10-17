@@ -41,7 +41,9 @@ pnpm exec supabase start -x studio,imgproxy,edge-runtime,logflare,vector,supavis
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | ✓ | anon 키. RLS로 모든 테이블이 막혀 있어 실제로는 쓰이지 않지만 표준 설정으로 둠 |
 | `SUPABASE_SERVICE_ROLE_KEY` | ✓ | 서버 전용. 모든 DB·Storage 접근은 이 키로 Route Handler에서만 |
 | `ANTHROPIC_API_KEY` | ✓(배포) | 초안 생성용 |
-| `ANTHROPIC_MODEL` | ✓ | 예: `claude-opus-5-5` |
+| `ANTHROPIC_MODEL` | ✓ | 기본 `claude-sonnet-5-5` (사건당 200원 상한 기준). Opus 는 200원 안에서 재생성 횟수가 줄어듦 |
+| `AI_BUDGET_KRW_PER_CASE` | | 사건 1건당 AI 비용 상한(원). 기본 200 |
+| `KRW_PER_USD` | | 상한 계산용 환율. 기본 1400 |
 | `NEXT_PUBLIC_KAKAO_JS_KEY` | | 카카오 JS 키. 없으면 [카톡으로 보내기]가 Web Share → 링크 복사로 대체 |
 | `NEXT_PUBLIC_SITE_URL` | ✓ | 예: `https://sue-my-friend.vercel.app` (링크·OG 이미지 절대 경로, Origin 검사에 사용) |
 | `PROMPT_CANARY` | ✓ | 시스템 프롬프트 끝에 붙는 랜덤 문자열. 출력에 나오면 유출로 보고 폐기 |
@@ -110,6 +112,15 @@ supabase/migrations/          DB 스키마 (RLS 전면 차단)
 - 공방 턴(6h) 경과 → 해당 턴을 "진술 포기"로 기록하고 다음 턴으로 (여러 턴이 지났으면 연속 처리)
 - 공방 종료 → 배심원을 초대했으면 투표(6h), 초대하지 않았으면 AI 재판장이 바로 판결
 - 투표 마감(6h) 경과 → 최다 득표 판결, 동률이면 쌍방 과실, 0표면 AI 재판장 판결
+
+### 사건당 AI 비용 상한
+
+- 초안·재생성·AI 재판장을 합쳐 사건 1건에 `AI_BUDGET_KRW_PER_CASE`(기본 200원)를 넘지 않게 호출한다 (`src/server/aiBudget.ts`).
+- 사용액은 `cases.ai_cost_usd`에 실제 청구 토큰(`usage`) 기준으로 누적한다.
+- 호출 전에 남은 예산에서 입력 비용(글자 수 × 1.5 토큰으로 넉넉히 추정)을 빼고, 남는 만큼만 `max_tokens`로 준다. 출력은 `max_tokens`를 넘지 않으므로 호출 1번이 상한을 넘을 수 없다.
+- 초안은 AI 재판장 몫(입력 8천 + 출력 3천 토큰)을 남겨 두고 쓴다. 남은 예산으로 초안이 잘릴 정도면 재생성을 거절한다("AI 사용 한도에 도달").
+- AI 재판장도 남은 예산이 모자라면 부르지 않고 규칙 기반으로 판결한다.
+- 생각(thinking) 토큰도 출력 요금이라 두 호출 모두 `effort: "low"`.
 
 ### 배심원 초대와 AI 재판장
 

@@ -40,6 +40,8 @@ export type CaseRow = {
   jury_invited_at: string | null;
   defendant_response: "accept" | "object" | "countersue" | "ignore" | null;
   regen_count: number;
+  /** 이 사건에 쓴 AI 비용 (USD, numeric 이라 문자열로 올 수 있음) */
+  ai_cost_usd: number | string;
   token_salt: string;
   created_at: string;
 };
