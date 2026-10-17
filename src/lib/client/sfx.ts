@@ -18,13 +18,55 @@ export function setMuted(m: boolean) {
   } catch {}
 }
 
+let master: AudioNode | null = null;
+
 function ac(): AudioContext | null {
   if (typeof window === "undefined") return null;
   const AC = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
   if (!AC) return null;
-  ctx ??= new AC();
+  if (!ctx) {
+    // iOS: 무음 스위치가 켜져 있어도 효과음이 나게 (Safari 17+)
+    const session = (navigator as unknown as { audioSession?: { type: string } }).audioSession;
+    if (session) session.type = "playback";
+    ctx = new AC();
+  }
   if (ctx.state === "suspended") ctx.resume().catch(() => {});
   return ctx;
+}
+
+/** 모든 효과음이 지나가는 출력: 휴대폰 스피커에서도 들리게 키우고, 리미터로 찢어지지 않게 */
+function out(a: AudioContext): AudioNode {
+  if (master) return master;
+  const comp = a.createDynamicsCompressor();
+  comp.threshold.value = -14;
+  comp.knee.value = 8;
+  comp.ratio.value = 6;
+  comp.attack.value = 0.002;
+  comp.release.value = 0.12;
+  const gain = a.createGain();
+  gain.gain.value = 2.4;
+  gain.connect(comp).connect(a.destination);
+  master = gain;
+  return master;
+}
+
+/**
+ * 모바일 브라우저는 사용자가 화면을 처음 누를 때까지 소리를 막는다.
+ * 첫 터치·클릭·키 입력에서 오디오를 깨우고 무음 한 샘플을 재생해 잠금을 푼다.
+ */
+function unlock() {
+  const a = ac();
+  if (!a) return;
+  const src = a.createBufferSource();
+  src.buffer = a.createBuffer(1, 1, 22050);
+  src.connect(a.destination);
+  src.start(0);
+  if (a.state === "running") {
+    for (const ev of ["pointerdown", "touchend", "keydown"]) window.removeEventListener(ev, unlock, true);
+  }
+}
+if (typeof window !== "undefined") {
+  for (const ev of ["pointerdown", "touchend", "keydown"]) window.addEventListener(ev, unlock, true);
 }
 
 /** 컷인: 낮은 쿵 + 짧은 노이즈 쨍 */
@@ -40,7 +82,7 @@ export function playImpact() {
   osc.frequency.exponentialRampToValueAtTime(40, t + 0.35);
   g.gain.setValueAtTime(0.6, t);
   g.gain.exponentialRampToValueAtTime(0.001, t + 0.4);
-  osc.connect(g).connect(a.destination);
+  osc.connect(g).connect(out(a));
   osc.start(t);
   osc.stop(t + 0.42);
 
@@ -55,7 +97,7 @@ export function playImpact() {
   hp.frequency.value = 2200;
   ng.gain.value = 0.35;
   src.buffer = buf;
-  src.connect(hp).connect(ng).connect(a.destination);
+  src.connect(hp).connect(ng).connect(out(a));
   src.start(t);
 }
 
@@ -71,7 +113,7 @@ export function playBlip() {
   osc.frequency.value = 620 + Math.random() * 60;
   g.gain.setValueAtTime(0.04, t);
   g.gain.exponentialRampToValueAtTime(0.001, t + 0.05);
-  osc.connect(g).connect(a.destination);
+  osc.connect(g).connect(out(a));
   osc.start(t);
   osc.stop(t + 0.06);
 }
@@ -90,7 +132,7 @@ export function playGavel() {
     osc.frequency.exponentialRampToValueAtTime(90, t + 0.12);
     g.gain.setValueAtTime(0.7, t);
     g.gain.exponentialRampToValueAtTime(0.001, t + 0.18);
-    osc.connect(g).connect(a.destination);
+    osc.connect(g).connect(out(a));
     osc.start(t);
     osc.stop(t + 0.2);
   });
@@ -119,7 +161,7 @@ function noise(a: AudioContext, o: NoiseOpts) {
   g.gain.exponentialRampToValueAtTime(o.gain, t + atk);
   g.gain.exponentialRampToValueAtTime(0.0001, t + o.dur);
   src.buffer = buf;
-  src.connect(f).connect(g).connect(a.destination);
+  src.connect(f).connect(g).connect(out(a));
   src.start(t);
   src.stop(t + o.dur + 0.02);
 }
@@ -133,7 +175,7 @@ function tone(a: AudioContext, o: { at?: number; dur: number; type?: OscillatorT
   if (o.to) osc.frequency.exponentialRampToValueAtTime(o.to, t + o.dur);
   g.gain.setValueAtTime(o.gain, t);
   g.gain.exponentialRampToValueAtTime(0.0001, t + o.dur);
-  osc.connect(g).connect(a.destination);
+  osc.connect(g).connect(out(a));
   osc.start(t);
   osc.stop(t + o.dur + 0.02);
 }
@@ -141,7 +183,10 @@ function tone(a: AudioContext, o: { at?: number; dur: number; type?: OscillatorT
 function play(fn: (a: AudioContext) => void) {
   if (isMuted()) return;
   const a = ac();
-  if (a) fn(a);
+  if (!a) return;
+  // 아직 깨어나는 중이면 깨어난 뒤에 재생 (그냥 두면 소리가 사라진다)
+  if (a.state === "running") fn(a);
+  else a.resume().then(() => fn(a)).catch(() => {});
 }
 
 /** 펜으로 쓰는 사각 소리 (입력할 때, 너무 잦지 않게 끊어서) */
