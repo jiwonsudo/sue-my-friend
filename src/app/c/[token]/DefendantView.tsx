@@ -1,5 +1,6 @@
 "use client";
 
+import { LegalLinks } from "@/components/LegalLinks";
 import { playStamp } from "@/lib/client/sfx";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import Link from "next/link";
@@ -258,6 +259,7 @@ function ReplySlip({
           <button type="button" className="min-h-10 underline" onClick={onReport}>
             신고
           </button>
+          <LegalLinks className="min-h-10 items-center" />
         </div>
       </div>
     </div>

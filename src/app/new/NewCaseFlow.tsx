@@ -1,5 +1,6 @@
 "use client";
 
+import { LegalLinks } from "@/components/LegalLinks";
 import { playCrumple, playSlide, playStamp } from "@/lib/client/sfx";
 import { AnimatePresence, motion } from "framer-motion";
 import { useRouter } from "next/navigation";
@@ -121,6 +122,9 @@ export function NewCaseFlow({ initial, resume }: { initial: Pick<Input, "type" |
               접수
             </button>
             <p className={`${trayNote} text-center`}>{valid ? "접수하면 통고서 초안이 바로 작성됨" : "원고·피고·경위·청구를 모두 기재할 것"}</p>
+            <p className={`${trayNote} text-center text-[10.5px]`}>
+              접수 시 <LegalLinks className="gap-1.5" />에 동의한 것으로 봄. 실명·연락처 기재 금지.
+            </p>
           </div>
         }
       >
