@@ -1,36 +1,141 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 친구 고소하기
 
-## Getting Started
+치킨 내기, 읽씹, 노쇼, 빌린 돈 같은 사소한 원한을 아주 진지한 통고서로 보내고, 상대가 버티면 3라운드 공방 → 배심원 투표 → 판결까지 가는 장난 웹 서비스.
 
-First, run the development server:
+> 형식은 끝까지 진지한 법률 문서, 내용은 끝까지 하찮게.
+
+- Next.js 15 (App Router) · TypeScript · Tailwind CSS v4 · Framer Motion
+- Supabase (Postgres + Storage), 클라이언트는 Supabase에 직접 접근하지 않음
+- Anthropic API (`@anthropic-ai/sdk`)로 통고서 초안 생성
+- `next/og`로 링크 미리보기·판결문 이미지 생성
+
+---
+
+## 로컬 실행
+
+필요한 것: Node 20+, pnpm, Docker(로컬 Supabase용)
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
+pnpm install
+pnpm exec supabase start      # 로컬 Supabase (Docker)
+pnpm exec supabase db reset   # supabase/migrations 적용
+cp .env.example .env.local    # 아래 환경변수 채우기
 pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+로컬 Supabase 키는 `pnpm exec supabase status -o env`로 확인할 수 있습니다 (`API_URL`, `ANON_KEY`, `SERVICE_ROLE_KEY`).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+> `ANTHROPIC_API_KEY`가 비어 있고 `NODE_ENV`가 production이 아니면, 초안 API는 **고정된 가짜 초안**을 돌려줍니다. 키 없이도 전체 흐름을 테스트할 수 있게 하기 위함이며, 배포 환경에서는 동작하지 않습니다.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Studio 등 무거운 컨테이너가 필요 없다면:
 
-## Learn More
+```bash
+pnpm exec supabase start -x studio,imgproxy,edge-runtime,logflare,vector,supavisor,realtime,inbucket,postgres-meta
+```
 
-To learn more about Next.js, take a look at the following resources:
+## 환경변수
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+| 이름 | 필수 | 설명 |
+| --- | --- | --- |
+| `NEXT_PUBLIC_SUPABASE_URL` | ✓ | Supabase 프로젝트 URL |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | ✓ | anon 키. RLS로 모든 테이블이 막혀 있어 실제로는 쓰이지 않지만 표준 설정으로 둠 |
+| `SUPABASE_SERVICE_ROLE_KEY` | ✓ | 서버 전용. 모든 DB·Storage 접근은 이 키로 Route Handler에서만 |
+| `ANTHROPIC_API_KEY` | ✓(배포) | 초안 생성용 |
+| `ANTHROPIC_MODEL` | ✓ | 예: `claude-opus-5-5` |
+| `NEXT_PUBLIC_KAKAO_JS_KEY` | | 카카오 JS 키. 없으면 [카톡으로 보내기]가 Web Share → 링크 복사로 대체 |
+| `NEXT_PUBLIC_SITE_URL` | ✓ | 예: `https://sue-my-friend.vercel.app` (링크·OG 이미지 절대 경로, Origin 검사에 사용) |
+| `PROMPT_CANARY` | ✓ | 시스템 프롬프트 끝에 붙는 랜덤 문자열. 출력에 나오면 유출로 보고 폐기 |
+| `TOKEN_SECRET` | ✓ | 32자 이상 랜덤 (`openssl rand -hex 32`). 피고·배심원 링크 토큰 파생용 |
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Supabase 설정 순서 (클라우드)
 
-## Deploy on Vercel
+1. [supabase.com](https://supabase.com)에서 프로젝트 생성
+2. 로컬에서 연결하고 마이그레이션 적용
+   ```bash
+   pnpm exec supabase login
+   pnpm exec supabase link --project-ref <프로젝트 ref>
+   pnpm exec supabase db push
+   ```
+3. Storage에 비공개 버킷 `evidence`가 생겼는지 확인 (마이그레이션이 생성: 비공개, 5MB, 이미지 MIME만)
+4. Project Settings → API에서 URL, anon 키, service_role 키를 복사해 환경변수에 넣기
+5. (선택) 카카오 개발자 콘솔에서 JS 키 발급 → 플랫폼 > Web에 사이트 도메인 등록
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Vercel 배포
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+1. 저장소를 Vercel에 Import
+2. 위 환경변수 전부 등록 (`NEXT_PUBLIC_SITE_URL`은 실제 도메인)
+3. Deploy
+
+---
+
+## 구조
+
+```
+src/
+  app/
+    page.tsx                  랜딩
+    new/                      통고서 작성 · 미리보기 · 톤 재생성 · 직접 수정
+    case/[id]/                원고 현황판 (원고 쿠키 필요)
+    case/[id]/trial/          공방 (원고/피고 쿠키)
+    c/[token]/                피고 수신 (우편함 연출)
+    j/[token]/                배심원 투표
+    v/[caseId]/               판결문 (공개)
+    enter/[token]/            "내 사건 링크" → 쿠키 발급 후 이동
+    api/...                   모든 쓰기·읽기 (service role)
+    api/og/...                링크 미리보기·판결문 이미지
+  server/                     서버 전용 (server-only)
+    prompts/draft.ts          시스템 프롬프트 (이 파일에만)
+    llm.ts                    초안 생성 + 유출 검사
+    cases.ts                  사건 로드 + lazy 기한 처리 + 판결 생성
+    auth.ts, tokens.ts        링크 토큰·쿠키 인증
+  lib/                        클라이언트·서버 공용 (상수, 문서 템플릿, 공방 순서)
+supabase/migrations/          DB 스키마 (RLS 전면 차단)
+```
+
+### 접근 방식
+
+- 로그인 없음. 역할별 링크 토큰(32바이트, base64url)으로 들어오고, DB에는 SHA-256 해시만 저장.
+  - 원고: 사건 생성 시 랜덤 토큰 발급 → httpOnly 쿠키 + "내 사건 링크"(`/enter/<token>`)
+  - 피고·배심원: `HMAC(TOKEN_SECRET, 사건id:역할:사건별 salt)`로 파생. 원고가 현황판에서 발송 링크를 다시 볼 수 있어야 해서 원문을 저장하지 않고 파생하는 방식을 택함.
+  - 피고는 `/c/<token>`을 열 때 피고 쿠키가 발급되어 이후 공방 화면에 들어갈 수 있음.
+- 모든 테이블 RLS ON + 정책 없음 + anon/authenticated 권한 회수. 읽기·쓰기는 Route Handler에서 service role로, 서버가 쿠키 토큰과 역할을 검증.
+- 모든 POST/PATCH는 `Origin` 헤더가 같은 출처일 때만 허용.
+- 증거·집행 인증 이미지는 비공개 버킷, 화면에는 1시간 서명 URL로만.
+
+### 기한 처리 (크론 없음)
+
+사건을 불러올 때마다(`loadCase`) 서버가 마감을 확인하고 상태를 넘깁니다.
+
+- 답변 기한(24h) 경과 → `defendant_response = ignore`, 궐석 판결
+- 공방 턴(24h) 경과 → 해당 턴을 "진술 포기"로 기록하고 다음 턴으로 (여러 턴이 지났으면 연속 처리)
+- 투표 마감(24h) 경과 → 최다 득표 판결, 동률·0표면 쌍방 과실
+
+### 테스트할 때 마감 당기기
+
+```sql
+-- 답변 기한 → 궐석 판결
+update cases set response_deadline_at = now() - interval '1 minute' where case_no = '2026킹-0001';
+-- 투표 마감 → 판결
+update cases set voting_deadline_at = now() - interval '1 minute' where case_no = '2026킹-0001';
+-- 공방 턴 만료 → 진술 포기 (시작 시각을 과거로)
+update cases set trial_started_at = now() - interval '2 days' where case_no = '2026킹-0001';
+```
+
+로컬에서는 `docker exec -it supabase_db_sue-my-friend psql -U postgres`로 접속할 수 있습니다. 다음에 그 사건 화면을 열면 반영됩니다.
+
+### 프롬프트 추출 방지
+
+1. 시스템 프롬프트는 `src/server/prompts/draft.ts`에만 있고 `server-only`로 클라이언트 번들에 들어가지 않음. API는 파싱한 `title`, `items`, `preview_line`만 반환.
+2. 출력에 `PROMPT_CANARY`가 있거나, 시스템 프롬프트와 연속 20자 이상 겹치면(공백·JSON 기호·이스케이프를 정규화해서 비교) 폐기 후 재생성. 2회 연속이면 "초안을 만들 수 없는 내용이에요". 프롬프트가 그대로 쓰라고 지시한 지체책임 문장과 자리표시자는 예외.
+3. 입력 길이 제한(무슨 일 500자, 원하는 것 100자), `<user_input>` 태그 문자열 제거.
+4. IP당 시간당 초안 10회, 사건당 4회(최초 1 + 재생성 3).
+5. 같은 출처 요청만 허용.
+
+## 스크립트
+
+```bash
+pnpm dev         # 개발 서버
+pnpm build       # 프로덕션 빌드
+pnpm lint        # ESLint
+pnpm typecheck   # tsc --noEmit
+```
