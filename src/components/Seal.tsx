@@ -42,11 +42,11 @@ export function Seal({ name, size = 64, className = "" }: { name: string; size?:
   );
 }
 
-/** 봉투·판결문용 사각 스탬프 */
+/** 봉투·판결문용 사각 고무도장. 이중 테두리 + 잉크가 고르게 묻지 않은 질감. */
 export function RubberStamp({ text, className = "" }: { text: string; className?: string }) {
   return (
     <span
-      className={`inline-block rounded-sm border-[3px] border-seal px-2 py-0.5 font-serif text-lg font-black tracking-[0.2em] text-seal opacity-90 ${className}`}
+      className={`stamp-ink inline-block border-[3px] border-double border-seal px-2 py-0.5 font-serif text-lg font-black tracking-[0.2em] text-seal opacity-90 outline-[1.5px] outline-offset-2 outline-seal outline ${className}`}
       style={{ mixBlendMode: "multiply" }}
     >
       {text}

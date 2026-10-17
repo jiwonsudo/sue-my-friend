@@ -54,7 +54,7 @@ export default async function JuryPage({ params }: Props) {
   const open = c.status === "trial" || c.status === "voting";
   return (
     <div className="court-bg min-h-dvh text-white">
-      <Header dark />
+      <Header />
       <main className="mx-auto max-w-md px-4 pt-6 pb-80">
         <p className="text-xs tracking-wider text-white/40">{c.case_no} · 배심원 열람용</p>
         <h1 className="mt-1 font-serif text-xl font-bold">{c.draft.title}</h1>

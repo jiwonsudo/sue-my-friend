@@ -96,7 +96,7 @@ export function TrialClient({
   return (
     <div className="court-bg min-h-dvh text-white">
       <Header
-        dark
+
         right={
           <div className="flex items-center gap-1">
             {canSwitch && (
