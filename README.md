@@ -106,7 +106,7 @@ supabase/migrations/          DB 스키마 (RLS 전면 차단)
   - 피고는 `/c/<token>`을 열 때 피고 쿠키가 발급되어 이후 공방 화면에 들어갈 수 있음.
 - 모든 테이블 RLS ON + 정책 없음 + anon/authenticated 권한 회수. 읽기·쓰기는 Route Handler에서 service role로, 서버가 쿠키 토큰과 역할을 검증.
 - 모든 POST/PATCH는 `Origin` 헤더가 같은 출처일 때만 허용.
-- 증거·집행 인증 이미지는 비공개 버킷, 화면에는 1시간 서명 URL로만.
+- 증거 이미지는 비공개 버킷, 화면에는 1시간 서명 URL로만. (집행 인증 기능은 없앰. `judgments.execution_proof_path`·`executed_at` 칸은 쓰지 않음)
 
 ### 기한 처리 (크론 없음)
 

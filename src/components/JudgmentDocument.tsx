@@ -14,18 +14,15 @@ export type JudgmentDocumentProps = {
   verdictLabel: string;
   /** 서명란: 재판장 (AI) / 본 법정 */
   signer?: string;
-  executed?: boolean;
   compact?: boolean;
   className?: string;
   style?: React.CSSProperties;
   /** 판결 도장 자리를 연출용으로 바꿔 끼울 때 */
   verdictStamp?: React.ReactNode;
-  executedStamp?: React.ReactNode;
 };
 
 export function JudgmentDocument(p: JudgmentDocumentProps) {
   const verdict = p.verdictStamp ?? <RubberStamp text={p.verdictLabel} className="-rotate-6" />;
-  const executed = p.executedStamp ?? (p.executed ? <RubberStamp text="집행 완료" className="bg-paper/30 px-4 !text-3xl" /> : null);
   return (
     <Sheet
       formNo={p.compact ? undefined : FORM_NO.judgment}
@@ -61,7 +58,6 @@ export function JudgmentDocument(p: JudgmentDocumentProps) {
           </div>
           {verdict}
         </div>
-        {executed && <div className="pointer-events-none absolute bottom-[38%] left-5 -rotate-12">{executed}</div>}
         <hr className={`mb-3 border-paper-line ${p.compact ? "mt-5" : "mt-8"}`} />
         <Disclaimer className={p.compact ? "text-[10px]" : ""} />
       </div>

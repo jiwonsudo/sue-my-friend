@@ -30,7 +30,7 @@ const STATUS: Record<CaseStatus, string> = {
   trial: "공방 진행 중",
   voting: "판결 선고 대기",
   judged: "판결 선고",
-  executed: "집행 완료",
+  executed: "판결 선고",
   dismissed: "기각됨",
 };
 

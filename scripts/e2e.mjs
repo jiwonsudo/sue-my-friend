@@ -128,13 +128,8 @@ const vpage = await stranger.req(`/v/${id}`);
 ok(vpage.status === 200 && vpage.data.includes(sql(`select order_text from judgments where case_id='${id}'`)), "판결 페이지에 주문");
 ok(sql(`select verdict from judgments where case_id='${id}'`) === "both", "키 없을 때 규칙 판결: 진술 수·변호인 인용 같으면 쌍방 과실");
 
-console.log("\n[5] 집행");
-ok((await P.req(`/api/cases/${id}/execution`, { method: "POST", body: png() })).status === 403, "승소 측은 인증 업로드 불가");
-ok((await P.req(`/api/cases/${id}/execution/confirm`, { method: "POST", json: {} })).status === 409, "인증 전 확인 불가");
-ok((await D.req(`/api/cases/${id}/execution`, { method: "POST", body: png() })).status === 200, "패소 측 인증 업로드");
-ok((await D.req(`/api/cases/${id}/execution/confirm`, { method: "POST", json: {} })).status === 403, "패소 측이 스스로 확인 불가");
-ok((await P.req(`/api/cases/${id}/execution/confirm`, { method: "POST", json: {} })).status === 200, "원고 확인");
-ok(sql(`select status from cases where id='${id}'`) === "executed", "status executed");
+console.log("\n[5] 집행 인증 기능 없음");
+ok((await D.req(`/api/cases/${id}/execution`, { method: "POST", body: png() })).status === 404, "집행 인증 API 없음");
 
 console.log("\n[6] OG 이미지");
 for (const [path, w, h] of [[`/api/og/case/${def}`, 1200, 630], [`/api/og/judgment/${id}`, 1200, 630], [`/api/og/judgment/${id}?format=story`, 1080, 1920]]) {

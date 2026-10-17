@@ -4,7 +4,6 @@ import { formatDate, loserOf, VERDICT_LABEL } from "@/lib/document";
 import { otherRole } from "@/lib/trial";
 import { rolesForCase } from "@/server/auth";
 import { fetchJudgment, loadCase } from "@/server/cases";
-import { signedUrl } from "@/server/supabase";
 import { JudgmentView } from "./JudgmentView";
 
 export const dynamic = "force-dynamic";
@@ -41,9 +40,6 @@ export default async function VerdictPage({ params }: Props) {
       caseId={c.id}
       me={me}
       loser={loser}
-      executed={!!j.executed_at}
-      proofUrl={me ? await signedUrl(j.execution_proof_path) : null}
-      hasProof={!!j.execution_proof_path}
       counterHref={`/new?type=custom&me=${encodeURIComponent(loser === "plaintiff" ? c.plaintiff_nick : c.defendant_nick)}&them=${encodeURIComponent(loser === "plaintiff" ? c.defendant_nick : c.plaintiff_nick)}`}
       doc={{
         caseNo: c.case_no,
