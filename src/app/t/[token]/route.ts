@@ -6,7 +6,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ toke
   const { token } = await params;
   const found = await resolveToken(token);
   if (!found) return NextResponse.redirect(new URL("/?expired=1", req.url));
-  if (found.role === "jury") return NextResponse.redirect(new URL(`/j/${token}`, req.url));
+  // 배심원 제도는 없어졌다 (예전 배심원 링크)
+  if (found.role === "jury") return NextResponse.redirect(new URL("/?expired=1", req.url));
   const res = NextResponse.redirect(new URL(`/case/${found.caseId}/trial?as=${found.role}`, req.url));
   setPartyCookie(res, found.caseId, found.role, token);
   return res;

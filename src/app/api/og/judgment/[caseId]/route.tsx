@@ -91,7 +91,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ case
             }}
           >
             <FormLine no="친고 서식 제9호" side="(1쪽)" size={24} />
-            <div style={{ display: "flex", fontFamily: "Type", fontSize: 26, color: OG.muted, letterSpacing: 6, marginTop: 56 }}>{SERVICE_NAME} 배심 법정</div>
+            <div style={{ display: "flex", fontFamily: "Type", fontSize: 26, color: OG.muted, letterSpacing: 6, marginTop: 56 }}>{SERVICE_NAME} 간이 법정</div>
             <div style={{ display: "flex", fontSize: 104, fontWeight: 900, letterSpacing: 80, marginTop: 16 }}>판결</div>
             <div style={{ display: "flex", width: 300, height: 12, borderTop: `3px solid ${OG.ink}`, borderBottom: `3px solid ${OG.ink}`, marginTop: 16 }} />
             <div style={{ display: "flex", flexDirection: "column", fontSize: 34, marginTop: 50, border: `3px solid ${OG.ink}` }}>

@@ -12,7 +12,7 @@ export type JudgmentDocumentProps = {
   reason: string;
   date: string;
   verdictLabel: string;
-  /** 서명란: 배심원 일동 / 재판장(AI) / 본 법정 */
+  /** 서명란: 재판장 (AI) / 본 법정 */
   signer?: string;
   executed?: boolean;
   compact?: boolean;
@@ -35,7 +35,7 @@ export function JudgmentDocument(p: JudgmentDocumentProps) {
       style={p.style}
     >
       <div className={p.compact ? "px-5 pt-5 pb-5" : "px-6 pt-5 pb-5 sm:px-9"}>
-        <p className="font-type text-[11px] tracking-[0.25em] text-black/50">{SERVICE_NAME} 배심 법정</p>
+        <p className="font-type text-[11px] tracking-[0.25em] text-black/50">{SERVICE_NAME} 간이 법정</p>
         <h1 className={`mt-2 leading-none font-black tracking-[0.9em] ${p.compact ? "text-[22px]" : "text-[28px]"}`}>판결</h1>
         <div className="mt-2.5 mb-5 h-[5px] w-[7.5rem] border-y border-ink" />
         <FormTable
@@ -57,7 +57,7 @@ export function JudgmentDocument(p: JudgmentDocumentProps) {
         <div className={`flex items-end justify-between ${p.compact ? "mt-5" : "mt-10"}`}>
           <div>
             <p className="tracking-[0.12em]">{p.date}</p>
-            <p className="mt-1 text-[0.9em] text-black/60">{p.signer ?? "배심원 일동"}</p>
+            <p className="mt-1 text-[0.9em] text-black/60">{p.signer ?? "재판장 (AI)"}</p>
           </div>
           {verdict}
         </div>

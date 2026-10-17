@@ -72,7 +72,7 @@ export const POST = handle<Ctx>(async (req, { params }) => {
   if (error) fail(409, "이미 진술이 제출되었습니다.");
 
   if (statements.length + 1 >= TRIAL_SLOTS.length) {
-    await finishTrial(c, new Date());
+    await finishTrial(c);
   }
   return NextResponse.json({ ok: true });
 });

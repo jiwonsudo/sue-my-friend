@@ -9,7 +9,6 @@ import { Countdown } from "@/components/Countdown";
 import { CutIn } from "@/components/CutIn";
 import { Header } from "@/components/Header";
 import { ShareButtons } from "@/components/ShareButtons";
-import { VoteBars } from "@/components/VoteBars";
 import { Typewriter } from "@/components/Typewriter";
 import { api } from "@/lib/client/api";
 import { isMuted, setMuted } from "@/lib/client/sfx";
@@ -21,14 +20,10 @@ const POLL_MS = 5000;
 
 export function TrialClient({
   initial,
-  juryLink,
-  juryImage,
   canSwitch,
   notifyLinks,
 }: {
   initial: TrialView;
-  juryLink: string | null;
-  juryImage: string | null;
   canSwitch: boolean;
   notifyLinks: Record<Role, string>;
 }) {
@@ -38,12 +33,8 @@ export function TrialClient({
   const [cutIn, setCutIn] = useState<{ line: string; by: string } | null>(null);
   const [muted, setMutedState] = useState(false);
   const [zoom, setZoom] = useState<PublicEvidence | null>(null);
-  const [showJury, setShowJury] = useState(false);
   // 내 진술을 낸 직후에는 상대에게 알릴 공유 버튼을 펼쳐 둔다
   const [showNotify, setShowNotify] = useState(false);
-  const [jury, setJury] = useState<{ link: string; image: string } | null>(juryLink && juryImage ? { link: juryLink, image: juryImage } : null);
-  const [inviting, setInviting] = useState(false);
-  const [inviteError, setInviteError] = useState<string | null>(null);
 
 
   const logEnd = useRef<HTMLDivElement>(null);
@@ -58,21 +49,7 @@ export function TrialClient({
     } catch {}
   }, [view.caseId, me, router]);
 
-  const invite = async () => {
-    if (!confirm("배심원을 초대하면 공방이 끝난 뒤 6시간 동안 배심원 투표로 판결합니다. (0표면 AI 재판장) 초대는 취소할 수 없습니다. 초대합니까?")) return;
-    setInviting(true);
-    setInviteError(null);
-    try {
-      const r = await api<{ jury: string }>(`/api/cases/${view.caseId}/jury`, { json: {} });
-      setJury({ link: r.jury, image: `${new URL(r.jury).origin}/api/og/jury/${r.jury.split("/j/")[1]}` });
-      setShowJury(true);
-      refresh();
-    } catch (e) {
-      setInviteError(e instanceof Error ? e.message : "초대 실패");
-    } finally {
-      setInviting(false);
-    }
-  };
+
   useEffect(() => {
     setMutedState(isMuted());
     const t = setInterval(() => document.visibilityState === "visible" && refresh(), POLL_MS);
@@ -103,7 +80,7 @@ export function TrialClient({
 
   const latest = [...view.statements].reverse().find((s) => !s.forfeited);
   const judgeLine = useMemo(() => {
-    if (view.status === "voting") return "공방을 종결합니다. 이제 배심원의 평결을 기다리겠습니다.";
+    if (view.status === "voting") return "공방을 종결합니다. 곧 판결을 선고하겠습니다.";
     const c = view.current;
     if (!c) return "";
     const side = `${ROLE_LABEL[c.role]} 측 ${nick(c.role)}`;
@@ -217,7 +194,7 @@ export function TrialClient({
       <div className="fixed inset-x-0 bottom-0 z-20 max-h-[64dvh] overflow-y-auto border-t border-white/15 bg-court px-4 pt-3 pb-[max(12px,env(safe-area-inset-bottom))]">
         <div className="mx-auto max-w-md">
           {view.status === "voting" ? (
-            <VotingPanel view={view} />
+            <p className="py-3 text-center font-type text-[13px] text-white/70">판결 선고 대기 중</p>
           ) : myTurn && view.current ? (
             <Compose
               view={view}
@@ -256,45 +233,11 @@ export function TrialClient({
               )}
             </div>
           ) : null}
-          {jury ? (
-            <>
-              <button
-                type="button"
-                onClick={() => setShowJury((v) => !v)}
-                aria-expanded={showJury}
-                className="mt-2 min-h-11 w-full border border-white/25 font-serif text-[14px] font-bold"
-              >
-                배심원 모집 링크 {showJury ? "닫기" : "보기"}
-              </button>
-              <p className="mt-1.5 text-center font-type text-[11px] text-[#e8c77a]">
-                배심원 초대됨. 공방이 끝나면 배심원 투표(6시간)로 판결함. 0표면 AI 재판장.
-              </p>
-              {showJury && (
-                <div className="mt-2">
-                  <ShareButtons
-                    compact
-                    url={jury.link}
-                    title={`${view.title} — 배심원을 모집합니다`}
-                    text="공방 기록을 읽고 원고 승·피고 승·쌍방 과실 중 하나에 투표."
-                    imageUrl={jury.image}
-                    buttonLabel="배심원 참여"
-                  />
-                </div>
-              )}
-            </>
-          ) : view.status === "trial" ? (
-            <div className="mt-2 border-t border-dashed border-white/15 pt-2">
-              <button type="button" disabled={inviting} onClick={invite} className="min-h-11 w-full border border-white/25 font-serif text-[14px] font-bold disabled:opacity-40">
-                배심원 초대
-              </button>
-              <p className="mt-1.5 text-center font-type text-[11px] leading-relaxed text-white/50">
-                초대 시: 공방 종료 후 배심원 투표(6시간)로 판결.
-                <br />
-                미초대 시: 공방 종료 즉시 AI 재판장이 양측 진술로 판결.
-              </p>
-              {inviteError && <p className="text-center text-sm text-red-300">{inviteError}</p>}
-            </div>
-          ) : null}
+          {view.status === "trial" && (
+            <p className="mt-2 border-t border-dashed border-white/15 pt-2 text-center font-type text-[11px] leading-relaxed text-white/50">
+              3라운드가 끝나면 AI 재판장이 양측 진술을 검토해 바로 판결함.
+            </p>
+          )}
         </div>
       </div>
 
@@ -539,18 +482,6 @@ function Compose({ view, onDone }: { view: TrialView; onDone: () => void }) {
         {busy ? "제출 중" : slot.kind === "rebuttal" ? "이의 있음!" : `${label} 제출`}
       </button>
       {missing && !busy && <p className="-mt-1 text-center font-type text-[12px] text-[#ffb3a8]">{missing}</p>}
-    </div>
-  );
-}
-
-function VotingPanel({ view }: { view: TrialView }) {
-  const total = view.votes.plaintiff + view.votes.defendant + view.votes.both;
-  return (
-    <div className="space-y-2 py-1">
-      <p className="text-center font-type text-[13px]">
-        배심원 평의 중 · 마감까지 <Countdown deadline={view.votingDeadline} format="hm" className="font-bold" />
-      </p>
-      <VoteBars votes={view.votes} total={total} plaintiff={view.plaintiffNick} defendant={view.defendantNick} />
     </div>
   );
 }

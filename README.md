@@ -1,6 +1,6 @@
 # 내 친구 고소하기
 
-치킨 내기, 읽씹, 노쇼, 빌린 돈 같은 사소한 원한을 아주 진지한 통고서로 보내고, 상대가 버티면 3라운드 공방 → 배심원 투표 → 판결까지 가는 장난 웹 서비스.
+치킨 내기, 읽씹, 노쇼, 빌린 돈 같은 사소한 원한을 아주 진지한 통고서로 보내고, 상대가 버티면 3라운드 공방 → AI 재판장 판결까지 가는 장난 웹 서비스.
 
 > 형식은 끝까지 진지한 법률 문서, 내용은 끝까지 하찮게.
 
@@ -47,7 +47,7 @@ pnpm exec supabase start -x studio,imgproxy,edge-runtime,logflare,vector,supavis
 | `NEXT_PUBLIC_KAKAO_JS_KEY` | | 카카오 JS 키. 없으면 [카톡으로 보내기]가 Web Share → 링크 복사로 대체 |
 | `NEXT_PUBLIC_SITE_URL` | ✓ | 예: `https://sue-my-friend.vercel.app` (링크·OG 이미지 절대 경로, Origin 검사에 사용) |
 | `PROMPT_CANARY` | ✓ | 시스템 프롬프트 끝에 붙는 랜덤 문자열. 출력에 나오면 유출로 보고 폐기 |
-| `TOKEN_SECRET` | ✓ | 32자 이상 랜덤 (`openssl rand -hex 32`). 피고·배심원 링크 토큰 파생용 |
+| `TOKEN_SECRET` | ✓ | 32자 이상 랜덤 (`openssl rand -hex 32`). 피고 링크 토큰 파생용 |
 
 ## Supabase 설정 순서 (클라우드)
 
@@ -80,7 +80,7 @@ src/
     case/[id]/                원고 현황판 (원고 쿠키 필요)
     case/[id]/trial/          공방 (원고/피고 쿠키)
     c/[token]/                피고 수신 (우편함 연출)
-    j/[token]/                배심원 투표
+    t/[token]/                차례 알림 링크 → 쿠키 발급 후 공방으로
     v/[caseId]/               판결문 (공개)
     enter/[token]/            "내 사건 링크" → 쿠키 발급 후 이동
     api/...                   모든 쓰기·읽기 (service role)
@@ -98,7 +98,7 @@ supabase/migrations/          DB 스키마 (RLS 전면 차단)
 
 - 로그인 없음. 역할별 링크 토큰(32바이트, base64url)으로 들어오고, DB에는 SHA-256 해시만 저장.
   - 원고: 사건 생성 시 랜덤 토큰 발급 → httpOnly 쿠키 + "내 사건 링크"(`/enter/<token>`)
-  - 피고·배심원: `HMAC(TOKEN_SECRET, 사건id:역할:사건별 salt)`로 파생. 원고가 현황판에서 발송 링크를 다시 볼 수 있어야 해서 원문을 저장하지 않고 파생하는 방식을 택함.
+  - 피고: `HMAC(TOKEN_SECRET, 사건id:역할:사건별 salt)`로 파생. 원고가 현황판에서 발송 링크를 다시 볼 수 있어야 해서 원문을 저장하지 않고 파생하는 방식을 택함.
   - 피고는 `/c/<token>`을 열 때 피고 쿠키가 발급되어 이후 공방 화면에 들어갈 수 있음.
 - 모든 테이블 RLS ON + 정책 없음 + anon/authenticated 권한 회수. 읽기·쓰기는 Route Handler에서 service role로, 서버가 쿠키 토큰과 역할을 검증.
 - 모든 POST/PATCH는 `Origin` 헤더가 같은 출처일 때만 허용.
@@ -110,8 +110,7 @@ supabase/migrations/          DB 스키마 (RLS 전면 차단)
 
 - 답변 기한(12h) 경과 → `defendant_response = ignore`, 궐석 판결
 - 공방 턴(6h) 경과 → 해당 턴을 "진술 포기"로 기록하고 다음 턴으로 (여러 턴이 지났으면 연속 처리)
-- 공방 종료 → 배심원을 초대했으면 투표(6h), 초대하지 않았으면 AI 재판장이 바로 판결
-- 투표 마감(6h) 경과 → 최다 득표 판결, 동률이면 쌍방 과실, 0표면 AI 재판장 판결
+- 공방 종료(6턴 모두 진술 또는 진술 포기) → AI 재판장이 바로 판결
 
 ### 사건당 AI 비용 상한
 
@@ -122,20 +121,17 @@ supabase/migrations/          DB 스키마 (RLS 전면 차단)
 - AI 재판장도 남은 예산이 모자라면 부르지 않고 규칙 기반으로 판결한다.
 - 생각(thinking) 토큰도 출력 요금이라 두 호출 모두 `effort: "low"`.
 
-### 배심원 초대와 AI 재판장
+### AI 재판장
 
-- 배심원 링크는 공방 중에 당사자가 [배심원 초대]를 눌러야 열린다 (`cases.jury_invited_at`). 그 전에는 배심원 페이지와 투표가 막혀 있다.
 - AI 재판장은 청구와 양측이 제출한 진술(증언·반박·최후진술, 항변 카드, 진술 포기)만으로 판결한다. 시스템 프롬프트는 `src/server/prompts/judge.ts`.
 - `ANTHROPIC_API_KEY`가 없거나 호출이 실패·거절되면 정해진 규칙으로 판결한다: 진술을 포기한 턴이 적은 쪽이 이기고, 같으면 쌍방 과실.
-- `judgments.judged_by`: `system`(인낙·궐석), `jury`(배심원 평결), `judge`(AI 재판장)
+- `judgments.judged_by`: `system`(인낙·궐석), `judge`(AI 재판장). 배심원 제도는 없앴고 `votes` 테이블·`jury_invited_at`·`voting_deadline_at` 칸은 쓰지 않음 (예전 데이터 호환용으로 남겨 둠)
 
 ### 테스트할 때 마감 당기기
 
 ```sql
 -- 답변 기한 → 궐석 판결
 update cases set response_deadline_at = now() - interval '1 minute' where case_no = '2026킹-0001';
--- 투표 마감 → 판결
-update cases set voting_deadline_at = now() - interval '1 minute' where case_no = '2026킹-0001';
 -- 공방 턴 만료 → 진술 포기 (시작 시각을 과거로)
 update cases set trial_started_at = now() - interval '2 days' where case_no = '2026킹-0001';
 ```

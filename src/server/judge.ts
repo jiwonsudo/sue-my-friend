@@ -74,7 +74,7 @@ export function ruleBasedRuling(statements: StatementRow[]): Ruling {
 }
 
 /**
- * 배심원 없이 AI 재판장이 각자 제출한 진술을 바탕으로 판결한다. 어떤 경우에도 판결은 낸다.
+ * AI 재판장이 각자 제출한 진술을 바탕으로 판결한다. 어떤 경우에도 판결은 낸다.
  * 사건당 AI 예산에서 남은 만큼만 쓰고, 모자라면 부르지 않고 규칙 기반으로 판결한다.
  */
 export async function aiRuling(c: CaseRow, statements: StatementRow[]): Promise<Ruling> {

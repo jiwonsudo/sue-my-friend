@@ -15,7 +15,7 @@ import { DateStamp } from "@/components/desk/Stamps";
 import { btn, trayNote } from "@/components/desk/ui";
 import { RubberStamp } from "@/components/Seal";
 import { ShareButtons } from "@/components/ShareButtons";
-import { formatDate, formatDateTime, formatTime } from "@/lib/document";
+import { formatDate, formatTime } from "@/lib/document";
 import type { CaseStatus } from "@/lib/types";
 import { plaintiffTokenFromCookie, rolesForCase } from "@/server/auth";
 import { loadCase, partyLinks } from "@/server/cases";
@@ -28,7 +28,7 @@ const STATUS: Record<CaseStatus, string> = {
   sent: "송달됨 · 열람 대기",
   opened: "열람됨 · 답변 대기",
   trial: "공방 진행 중",
-  voting: "배심원 투표 중",
+  voting: "판결 선고 대기",
   judged: "판결 선고",
   executed: "집행 완료",
   dismissed: "기각됨",
@@ -119,7 +119,6 @@ export default async function CaseDashboard({ params }: { params: Promise<{ id: 
                   ...(responded
                     ? ([["피고 대응", { accept: "인정하고 이행", object: "이의신청", countersue: "맞고소" }[c.defendant_response as "accept"]]] as [string, string][])
                     : []),
-                  ...(c.status === "voting" && c.voting_deadline_at ? ([["투표 마감", formatDateTime(c.voting_deadline_at)]] as [string, string][]) : []),
                 ]}
               />
               {c.opened_at && (

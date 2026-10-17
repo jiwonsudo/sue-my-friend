@@ -96,33 +96,20 @@ ok((await D.req(`/api/cases/${id}/statements`, { method: "POST", json: { sentenc
 ok((await P.req(`/api/cases/${id}/statements`, { method: "POST", json: { sentences: ["그 가게는 24시간입니다."], targetSentenceIdx: 1, cardId: "delay" } })).status === 200, "R2 원고 반박");
 ok((await P.req(`/api/cases/${id}/statements`, { method: "POST", json: { sentences: ["치킨은 식기 전에 받아야 합니다.", "두 문장"] } })).status === 400, "최후진술 1문장 제한");
 const preHtml = (await P.req(`/case/${id}/trial?as=plaintiff`)).data;
-ok(!/\/j\/[A-Za-z0-9_-]{40,}/.test(preHtml), "초대 전 공방 화면에 배심원 링크 없음");
-ok((await stranger.req(`/api/cases/${id}/jury`, { method: "POST", json: {} })).status === 403, "남은 배심원 초대 불가");
-const inv = await D.req(`/api/cases/${id}/jury`, { method: "POST", json: {} });
-ok(inv.status === 200 && /\/j\/[A-Za-z0-9_-]{40,}/.test(inv.data.jury ?? ""), "피고가 배심원 초대");
+ok(!/\/j\/[A-Za-z0-9_-]{40,}/.test(preHtml) && preHtml.includes(`/t/${def}`), "공방 화면: 배심원 링크 없음, 피고 차례 알림 링크 있음");
+ok((await D.req(`/api/cases/${id}/jury`, { method: "POST", json: {} })).status === 404, "배심원 초대 API 없음");
 ok((await P.req(`/api/cases/${id}/statements`, { method: "POST", json: { sentences: ["치킨은 식기 전에 받아야 합니다."] } })).status === 200, "R3 원고 최후진술");
 ok((await D.req(`/api/cases/${id}/statements`, { method: "POST", json: { sentences: ["저는 결백합니다."] } })).status === 200, "R3 피고 최후진술");
-ok(sql(`select status from cases where id='${id}'`) === "voting", "배심원 초대한 사건은 3라운드 후 voting");
+ok(sql(`select status || ':' || coalesce((select judged_by from judgments where case_id='${id}'), '-') from cases where id='${id}'`) === "judged:judge", "3라운드 끝나면 바로 AI 재판장 판결 (투표 없음)");
+ok(sql(`select voting_deadline_at is null from cases where id='${id}'`) === "t", "투표 마감 없음");
 const tv = await P.req(`/api/cases/${id}/trial?as=plaintiff`);
 ok(tv.status === 200 && tv.data.statements.length === 6 && !JSON.stringify(tv.data).includes("token_salt"), "공방 상태 조회 (salt 비노출)");
 
-console.log("\n[4] 배심원 투표");
-const html = (await P.req(`/case/${id}/trial?as=plaintiff`)).data;
-const jury = html.match(/\/j\/([A-Za-z0-9_-]{40,})/)?.[1];
-ok(!!jury, "배심원 링크");
-ok((await P.req(`/api/j/${jury}/vote`, { method: "POST", json: { verdict: "plaintiff" } })).status === 403, "당사자 투표 불가");
-const J1 = new Jar("j1", "10.9.0.1"), J2 = new Jar("j2", "10.9.0.2"), J3 = new Jar("j3", "10.9.0.3");
-ok((await J1.req(`/api/j/${jury}/vote`, { method: "POST", json: { verdict: "plaintiff" } })).status === 200, "배심원1 투표");
-ok((await J1.req(`/api/j/${jury}/vote`, { method: "POST", json: { verdict: "defendant" } })).status === 409, "같은 사람 중복 투표 불가");
-await J2.req(`/api/j/${jury}/vote`, { method: "POST", json: { verdict: "plaintiff" } });
-const v3 = await J3.req(`/api/j/${jury}/vote`, { method: "POST", json: { verdict: "both" } });
-ok(v3.data.votes?.plaintiff === 2 && v3.data.votes?.both === 1, "득표 집계");
-sql(`update cases set voting_deadline_at = now() - interval '1 minute' where id='${id}'`);
+console.log("\n[4] 판결");
 const vpage = await stranger.req(`/v/${id}`);
-ok(sql(`select verdict || ':' || judged_by from judgments where case_id='${id}'`) === "plaintiff:jury", "마감 후 최다 득표 판결 (원고 승, 배심원)");
 // 판결문 본문은 망치 연출 뒤 클라이언트에서 그려지므로 서버가 내려준 주문 문구로 확인
 ok(vpage.status === 200 && vpage.data.includes(sql(`select order_text from judgments where case_id='${id}'`)), "판결 페이지에 주문");
-ok(sql(`select reason_text from judgments where case_id='${id}'`).includes("가장 많이 반박당한"), "이유에 반박당한 문장 인용");
+ok(sql(`select verdict from judgments where case_id='${id}'`) === "both", "키 없을 때 규칙 판결: 양측 진술 수 같으면 쌍방 과실");
 
 console.log("\n[5] 집행");
 ok((await P.req(`/api/cases/${id}/execution`, { method: "POST", body: png() })).status === 403, "승소 측은 인증 업로드 불가");
@@ -133,7 +120,7 @@ ok((await P.req(`/api/cases/${id}/execution/confirm`, { method: "POST", json: {}
 ok(sql(`select status from cases where id='${id}'`) === "executed", "status executed");
 
 console.log("\n[6] OG 이미지");
-for (const [path, w, h] of [[`/api/og/case/${def}`, 1200, 630], [`/api/og/jury/${jury}`, 1200, 630], [`/api/og/judgment/${id}`, 1200, 630], [`/api/og/judgment/${id}?format=story`, 1080, 1920]]) {
+for (const [path, w, h] of [[`/api/og/case/${def}`, 1200, 630], [`/api/og/judgment/${id}`, 1200, 630], [`/api/og/judgment/${id}?format=story`, 1080, 1920]]) {
   const res = await fetch(BASE + path); const buf = Buffer.from(await res.arrayBuffer());
   const W = buf.readUInt32BE(16), H = buf.readUInt32BE(20);
   ok(res.status === 200 && res.headers.get("content-type") === "image/png" && W === w && H === h, `${path.split("?")[0].split("/").slice(0, 4).join("/")} ${W}x${H}`);
@@ -155,15 +142,15 @@ await P3.req(`/case/${c3}`);
 ok(sql(`select verdict from judgments where case_id='${c3}'`) === "default", "궐석 판결");
 ok(sql(`select order_text from judgments where case_id='${c3}'`).startsWith("피고는 도주하였다"), "궐석 주문 '피고는 도주하였다'");
 
-console.log("\n[9] 맞고소 + 배심원 미초대 + 턴 만료 → 진술 포기 → AI 재판장 판결");
+console.log("\n[9] 맞고소 + 턴 만료 → 진술 포기 → AI 재판장 판결");
 const P4 = new Jar("p4", "10.7.7.7"), D4 = new Jar("d4", "10.8.8.8");
 const c4 = (await newCase(P4)).data.caseId; const l4 = await sendAndLink(P4, c4);
 await D4.req(`/api/c/${l4.def}/respond`, { method: "POST", json: { action: "countersue" } });
 sql(`update cases set trial_started_at = now() - interval '7 days' where id='${c4}'`);
 await P4.req(`/api/cases/${c4}/trial?as=plaintiff`);
 ok(sql(`select count(*) from statements where case_id='${c4}' and forfeited`) === "6", "만료된 턴 6개 진술 포기 기록");
-ok(sql(`select judged_by from judgments where case_id='${c4}'`) === "judge", "배심원 미초대 → AI 재판장 판결 (투표 단계 없음)");
-ok(sql(`select voting_deadline_at is null from cases where id='${c4}'`) === "t", "미초대 사건은 투표 마감 없음");
+ok(sql(`select judged_by from judgments where case_id='${c4}'`) === "judge", "턴 만료 후 AI 재판장 판결 (투표 단계 없음)");
+ok(sql(`select voting_deadline_at is null from cases where id='${c4}'`) === "t", "투표 마감 없음");
 
 console.log("\n[10] 기각");
 const P5 = new Jar("p5", "10.10.0.1"), D5 = new Jar("d5", "10.10.0.2");
@@ -173,24 +160,14 @@ await D5.req(`/api/c/${l5.def}/dismiss`, { method: "POST", json: {} });
 ok((await D5.req(`/c/${l5.def}`)).data.includes("기각된 사건"), "피고 화면 문서 숨김");
 ok((await P5.req(`/case/${c5}`)).data.includes("기각했습니다"), "원고 진행 차단");
 
-console.log("\n[11] 배심원 초대했지만 0표 → AI 재판장, 초대 전 투표 불가");
-const P7 = new Jar("p7", "10.12.0.1"), D7 = new Jar("d7", "10.12.0.2"), J7 = new Jar("j7", "10.12.0.3");
+console.log("\n[11] 차례 알림 링크");
+const P7 = new Jar("p7", "10.12.0.1"), D7 = new Jar("d7", "10.12.0.2");
 const c7 = (await newCase(P7)).data.caseId; const l7 = await sendAndLink(P7, c7);
 await D7.req(`/api/c/${l7.def}/respond`, { method: "POST", json: { action: "object" } });
 const T7 = new Jar("t7", "10.12.0.4");
 const t7 = await T7.req(`/t/${l7.def}`);
 ok(t7.status === 307 && t7.res.headers.get("location").endsWith(`/case/${c7}/trial?as=defendant`) && T7.header().includes("smf_"), "차례 알림 링크 → 공방 화면 + 피고 쿠키");
 ok((await T7.req(`/case/${c7}/trial?as=defendant`)).status === 200 && (await new Jar("x", "10.12.0.5").req(`/case/${c7}/trial`)).data.includes("공방 당사자만"), "알림 링크로만 입장, 남은 불가");
-const inv7 = await P7.req(`/api/cases/${c7}/jury`, { method: "POST", json: {} });
-const jt7 = inv7.data.jury.split("/j/")[1];
-ok((await J7.req(`/j/${jt7}`)).status === 200, "초대 후 배심원 페이지 열림");
-sql(`update cases set jury_invited_at = null where id='${c7}'`);
-ok((await J7.req(`/api/j/${jt7}/vote`, { method: "POST", json: { verdict: "both" } })).status === 409, "초대 전 투표 불가");
-ok((await J7.req(`/j/${jt7}`)).data.includes("배심원 모집 전"), "초대 전 배심원 페이지 닫힘");
-await P7.req(`/api/cases/${c7}/jury`, { method: "POST", json: {} });
-sql(`update cases set trial_started_at = now() - interval '7 days' where id='${c7}'`);
-await P7.req(`/api/cases/${c7}/trial?as=plaintiff`);
-ok(sql(`select judged_by from judgments where case_id='${c7}'`) === "judge", "0표로 마감 → AI 재판장 판결");
 
 console.log("\n[12] IP당 시간당 초안 10회");
 const P6 = new Jar("p6", "10.11.0.1");

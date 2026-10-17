@@ -23,7 +23,7 @@ export default async function TrialPage({
   if (!c) notFound();
   const roles = await rolesForCase(c.id);
   if (roles.length === 0) {
-    return <Gate title="공방 당사자만 입장할 수 있습니다" body="배심원은 공유받은 배심원 링크로 접속할 것." />;
+    return <Gate title="공방 당사자만 입장할 수 있습니다" body="원고는 사건을 만든 브라우저나 '내 사건 링크'로, 피고는 받은 통고서 링크로 접속할 것." />;
   }
   if (c.status === "judged" || c.status === "executed") redirect(`/v/${c.id}`);
   if (!["trial", "voting"].includes(c.status)) redirect(roles.includes("plaintiff") ? `/case/${c.id}` : "/");
@@ -36,8 +36,6 @@ export default async function TrialPage({
   return (
     <TrialClient
       initial={await buildTrialView(c, me)}
-      juryLink={c.jury_invited_at ? links.jury : null}
-      juryImage={c.jury_invited_at ? `${origin}/api/og/jury/${links.jury.split("/j/")[1]}` : null}
       canSwitch={roles.length > 1}
       notifyLinks={{
         // 피고에게는 쿠키를 심어 주는 호출 링크, 원고는 사건을 만든 브라우저에 쿠키가 있으므로 공방 주소

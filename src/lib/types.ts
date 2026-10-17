@@ -101,7 +101,4 @@ export type TrialView = {
   statements: StatementRow[];
   evidence: PublicEvidence[];
   current: (TrialSlot & { deadline: string }) | null;
-  votingDeadline: string | null;
-  juryInvited: boolean;
-  votes: { plaintiff: number; defendant: number; both: number };
 };

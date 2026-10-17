@@ -2,7 +2,7 @@ import "server-only";
 import { TURN_WINDOW_MS } from "@/lib/constants";
 import { currentSlot } from "@/lib/trial";
 import type { CaseRow, EvidenceRow, PublicEvidence, Role, TrialView } from "@/lib/types";
-import { fetchStatements, tallyVotes } from "./cases";
+import { fetchStatements } from "./cases";
 import { db, signedUrl } from "./supabase";
 
 export async function fetchEvidence(caseId: string): Promise<EvidenceRow[]> {
@@ -15,11 +15,7 @@ export async function fetchEvidence(caseId: string): Promise<EvidenceRow[]> {
 }
 
 export async function buildTrialView(c: CaseRow, me: Role | null): Promise<TrialView> {
-  const [statements, evidenceRows, votes] = await Promise.all([
-    fetchStatements(c.id),
-    fetchEvidence(c.id),
-    tallyVotes(c.id),
-  ]);
+  const [statements, evidenceRows] = await Promise.all([fetchStatements(c.id), fetchEvidence(c.id)]);
   const evidence: PublicEvidence[] = await Promise.all(
     evidenceRows.map(async (e) => ({
       id: e.id,
@@ -41,8 +37,5 @@ export async function buildTrialView(c: CaseRow, me: Role | null): Promise<Trial
     statements,
     evidence,
     current: slot ? { ...slot, deadline: new Date(new Date(last).getTime() + TURN_WINDOW_MS).toISOString() } : null,
-    votingDeadline: c.voting_deadline_at,
-    juryInvited: !!c.jury_invited_at,
-    votes,
   };
 }
