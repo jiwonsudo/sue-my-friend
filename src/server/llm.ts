@@ -48,7 +48,8 @@ function userMessage(input: DraftInput, tone: Tone, previous: Draft | null): str
 이전_초안: ${previous ? JSON.stringify(previous) : "없음"}`;
 }
 
-const squash = (s: string) => s.replace(/\s+/g, " ");
+/** 공백·줄바꿈·JSON 기호를 바꿔 피해가는 것을 막기 위해 모두 지우고 비교 */
+const squash = (s: string) => s.replace(/[\s{}[\]":,]+/g, "");
 
 let promptWindows: Set<string> | null = null;
 function windows(): Set<string> {
@@ -65,10 +66,17 @@ export function looksLeaked(raw: string): boolean {
   if (canary && raw.includes(canary)) return true;
   let text = raw;
   for (const ok of DRAFT_ALLOWED_PHRASES) text = text.replaceAll(ok, " ");
-  // JSON 이스케이프된 형태도 검사
-  const candidates = [text];
+  // JSON 이면 각 문자열 값을 따로(이스케이프를 푼 상태로), 아니면 원문 전체를 검사
+  let candidates = [text];
+  const start = text.indexOf("{");
+  const end = text.lastIndexOf("}");
   try {
-    candidates.push(JSON.stringify(JSON.parse(text.slice(text.indexOf("{"), text.lastIndexOf("}") + 1))));
+    const strings: string[] = [];
+    JSON.parse(text.slice(start, end + 1), (_k, v) => {
+      if (typeof v === "string") strings.push(v);
+      return v;
+    });
+    candidates = [...strings, text.slice(0, start), text.slice(end + 1)];
   } catch {}
   const w = windows();
   for (const cand of candidates) {
