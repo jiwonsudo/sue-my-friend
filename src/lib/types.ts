@@ -44,6 +44,8 @@ export type CaseRow = {
   /** 이 사건에 쓴 AI 비용 (USD, numeric 이라 문자열로 올 수 있음) */
   ai_cost_usd: number | string;
   token_salt: string;
+  /** 판결·기각된 시각. 이 시각 + CLOSED_RETENTION_MS 가 지나면 삭제된다 */
+  closed_at: string | null;
   created_at: string;
 };
 

@@ -1,5 +1,5 @@
 import "server-only";
-import { RESPONSE_WINDOW_MS, TURN_WINDOW_MS } from "@/lib/constants";
+import { CLOSED_RETENTION_MS, RESPONSE_WINDOW_MS, TURN_WINDOW_MS } from "@/lib/constants";
 import { orderText } from "@/lib/document";
 import { mostRebutted, TRIAL_SLOTS } from "@/lib/trial";
 import type { CaseRow, JudgmentRow, StatementRow, Verdict } from "@/lib/types";
@@ -11,7 +11,18 @@ import { deriveToken, hashToken } from "./tokens";
 export async function fetchCase(id: string): Promise<CaseRow | null> {
   if (!/^[0-9a-f-]{36}$/i.test(id)) return null;
   const { data } = await db().from("cases").select("*").eq("id", id).maybeSingle();
-  return (data as CaseRow) ?? null;
+  const c = (data as CaseRow) ?? null;
+  // 보관 시간이 지난 사건은 DB 정리 작업(10분 간격)이 돌기 전이라도 없는 것으로 본다
+  if (c && isPurged(c)) return null;
+  return c;
+}
+
+export function isPurged(c: CaseRow, now = Date.now()): boolean {
+  return !!c.closed_at && now > purgeAt(c.closed_at).getTime();
+}
+
+export function purgeAt(closedAt: string): Date {
+  return new Date(new Date(closedAt).getTime() + CLOSED_RETENTION_MS);
 }
 
 /** 사건을 불러오면서 지난 기한을 반영한다 (lazy 기한 처리). */

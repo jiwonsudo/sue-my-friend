@@ -61,6 +61,8 @@ export const HOUR = 60 * 60 * 1000;
 export const RESPONSE_WINDOW_MS = 12 * HOUR;
 export const TURN_WINDOW_MS = 6 * HOUR;
 export const VOTING_WINDOW_MS = 6 * HOUR;
+/** 판결·기각 후 사건 기록을 남겨 두는 시간 (DB 정리 작업: supabase/migrations/20261022000000_purge_closed.sql) */
+export const CLOSED_RETENTION_MS = 1 * HOUR;
 
 export const DEFENSE_CARDS = [
   {

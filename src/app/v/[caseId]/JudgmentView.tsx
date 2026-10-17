@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Desk } from "@/components/desk/Desk";
 import { DropIn, StampIn } from "@/components/desk/motion";
-import { btn } from "@/components/desk/ui";
+import { btn, trayNote } from "@/components/desk/ui";
 import { JudgmentDocument, type JudgmentDocumentProps } from "@/components/JudgmentDocument";
 import { RubberStamp } from "@/components/Seal";
 import { playGavel, playStamp } from "@/lib/client/sfx";
@@ -15,11 +15,13 @@ type Props = {
   caseId: string;
   me: Role | null;
   loser: Role;
+  /** 기록 폐기 예정 시각 (표시용) */
+  purgeAt: string | null;
   counterHref: string;
   doc: Omit<JudgmentDocumentProps, "compact" | "className">;
 };
 
-export function JudgmentView({ caseId, me, loser, counterHref, doc }: Props) {
+export function JudgmentView({ caseId, me, loser, purgeAt, counterHref, doc }: Props) {
   const reduce = useReducedMotion();
   const [phase, setPhase] = useState<"gavel" | "doc">(reduce ? "doc" : "gavel");
   const [stamped, setStamped] = useState(!!reduce);
@@ -102,6 +104,7 @@ export function JudgmentView({ caseId, me, loser, counterHref, doc }: Props) {
           <li>3. 링크 스티커에 이 페이지 주소 첨부.</li>
         </ol>
       )}
+      {purgeAt && <p className={`${trayNote} px-1`}>※ 선고 1시간 뒤({purgeAt}) 기록 폐기. 남기려면 이미지로 저장할 것.</p>}
       {me === loser && (
         <Link href={counterHref} className={`${btn.line} w-full border-seal/70 text-[#ff9a9a]`}>
           반소 제기
