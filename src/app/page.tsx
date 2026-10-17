@@ -35,8 +35,8 @@ export default async function Landing({ searchParams }: { searchParams: Promise<
         <LandingIntake />
       </div>
 
-      <section aria-label="지난 판결문" className="relative mt-10">
-        <p className="mb-2 -rotate-1 font-hand text-[22px] text-paper/80">지난 판결문 (처리 완료)</p>
+      <section aria-label="예시 판결문" className="relative mt-10">
+        <p className="mb-2 -rotate-1 font-hand text-[22px] text-paper/80">예시 판결문 (실제 사건 아님)</p>
         <div className="relative">
           <PaperClip className="absolute -top-4 left-8 z-20 h-16 w-6 rotate-[8deg]" />
           <JudgmentDocument
