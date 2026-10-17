@@ -50,6 +50,7 @@ body {
   --sheet-shadow: 0 1px 1px rgb(0 0 0 / 0.18), 0 6px 10px -4px rgb(0 0 0 / 0.35), 0 22px 40px -18px rgb(0 0 0 / 0.55);
 }
 
+@layer components {
 /* ── 책상 ─────────────────────────── */
 .desk-wood {
   background-color: var(--color-wood);
@@ -148,6 +149,8 @@ body {
   background:
     radial-gradient(ellipse at 50% -10%, rgb(200 16 46 / 0.14), transparent 60%),
     linear-gradient(180deg, #1b1e26 0%, #101217 100%);
+}
+
 }
 
 .no-scrollbar::-webkit-scrollbar {

@@ -1,4 +1,4 @@
-export const SERVICE_NAME = "친구 고소하기";
+export const SERVICE_NAME = "내 친구 고소하기";
 
 export const DISCLAIMER =
   "※ 본 문서는 친구 간 장난으로 작성된 것으로, 기재된 내용은 사실이 아닐 수 있으며 어떠한 법적 효력이나 책임도 발생하지 않습니다.";
