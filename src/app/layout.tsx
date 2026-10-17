@@ -24,6 +24,7 @@ export const metadata: Metadata = {
     description: "사소한 원한, 엄중한 형식. 친구에게 통고서를 보내세요.",
     locale: "ko_KR",
     type: "website",
+    images: [{ url: "/api/og/default", width: 1200, height: 630 }],
   },
 };
 
