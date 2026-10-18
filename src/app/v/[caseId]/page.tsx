@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
 import { Gate } from "@/components/Gate";
-import { formatDate, loserOf, VERDICT_LABEL } from "@/lib/document";
+import { formatDateTime, formatDate, loserOf, VERDICT_LABEL } from "@/lib/document";
 import { otherRole } from "@/lib/trial";
 import { rolesForCase } from "@/server/auth";
-import { fetchJudgment, loadCase } from "@/server/cases";
+import { fetchJudgment, loadCase, purgeAt } from "@/server/cases";
 import { JudgmentView } from "./JudgmentView";
 
 export const dynamic = "force-dynamic";
@@ -27,7 +27,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 export default async function VerdictPage({ params }: Props) {
   const { caseId } = await params;
   const c = await loadCase(caseId);
-  if (!c) return <Gate title="사건을 찾을 수 없습니다" body="주소를 다시 확인할 것." />;
+  if (!c) return <Gate title="사건을 찾을 수 없습니다" body="주소를 다시 확인할 것. 판결·기각된 사건은 1시간 뒤 기록이 폐기됨." />;
   const j = await fetchJudgment(c.id);
   if (!j) return <Gate title="아직 판결 전입니다" body="3라운드 공방이 끝나면 AI 재판장이 바로 선고함." />;
 
@@ -40,6 +40,7 @@ export default async function VerdictPage({ params }: Props) {
       caseId={c.id}
       me={me}
       loser={loser}
+      purgeAt={c.closed_at ? formatDateTime(purgeAt(c.closed_at)) : null}
       counterHref={`/new?type=custom&me=${encodeURIComponent(loser === "plaintiff" ? c.plaintiff_nick : c.defendant_nick)}&them=${encodeURIComponent(loser === "plaintiff" ? c.defendant_nick : c.plaintiff_nick)}`}
       doc={{
         caseNo: c.case_no,
