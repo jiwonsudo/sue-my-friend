@@ -7,7 +7,7 @@ import { requireCase } from "@/server/cases";
 import { assertSameOrigin, clientIp, fail, handle, readJson, siteUrl } from "@/server/http";
 import { generateDraft } from "@/server/llm";
 import { db } from "@/server/supabase";
-import { hashToken, randomToken, sha256 } from "@/server/tokens";
+import { deriveToken, hashToken, sha256 } from "@/server/tokens";
 import { caseInputSchema, parse, toneSchema } from "@/server/validate";
 
 const bodySchema = z.union([
@@ -65,7 +65,7 @@ export const POST = handle(async (req) => {
   if (error || !created) throw new Error("case insert");
   const c = created as CaseRow;
 
-  const token = randomToken();
+  const token = deriveToken(c.id, "plaintiff", c.token_salt);
   await db().from("party_tokens").insert({ case_id: c.id, role: "plaintiff", token_hash: hashToken(token) });
 
   const res = NextResponse.json({

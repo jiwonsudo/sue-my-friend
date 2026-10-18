@@ -18,10 +18,10 @@ function secret(): string {
 }
 
 /**
- * 피고 토큰은 원고가 현황판에서 다시 볼 수 있어야 하므로
+ * 당사자 토큰은 상대에게 보낼 링크(통고서, 공방 차례 알림)에 넣어야 하므로
  * (사건 id, 역할, 사건별 salt)에서 HMAC 으로 파생한다. DB 에는 해시만 저장.
  */
-export function deriveToken(caseId: string, role: Exclude<TokenRole, "plaintiff">, salt: string): string {
+export function deriveToken(caseId: string, role: TokenRole, salt: string): string {
   return createHmac("sha256", secret()).update(`${caseId}:${role}:${salt}`).digest("base64url");
 }
 
