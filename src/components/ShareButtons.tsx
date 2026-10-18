@@ -64,17 +64,23 @@ export function ShareButtons({
   const kakao = () => {
     const K = window.Kakao;
     if (!K || !KAKAO_KEY) return share();
-    if (!K.isInitialized()) K.init(KAKAO_KEY);
-    K.Share.sendDefault({
-      objectType: "feed",
-      content: {
-        title,
-        description: text,
-        imageUrl: imageUrl ?? `${location.origin}/api/og/default`,
-        link: { mobileWebUrl: url, webUrl: url },
-      },
-      buttons: [{ title: buttonLabel, link: { mobileWebUrl: url, webUrl: url } }],
-    });
+    try {
+      if (!K.isInitialized()) K.init(KAKAO_KEY);
+      K.Share.sendDefault({
+        objectType: "feed",
+        content: {
+          title,
+          description: text,
+          imageUrl: imageUrl ?? `${location.origin}/api/og/default`,
+          link: { mobileWebUrl: url, webUrl: url },
+        },
+        buttons: [{ title: buttonLabel, link: { mobileWebUrl: url, webUrl: url } }],
+      });
+    } catch (e) {
+      // 키가 틀렸거나 카카오 개발자 콘솔에 이 도메인이 등록되지 않은 경우. 조용히 죽지 말고 다른 공유로 넘긴다
+      console.error("[kakao share]", e);
+      share();
+    }
   };
 
   const btn = "min-h-11 rounded-[2px] px-4 font-serif text-[15px] font-bold transition active:translate-y-px";
@@ -84,7 +90,7 @@ export function ShareButtons({
         <Script
           src="https://t1.kakaocdn.net/kakao_js_sdk/2.7.4/kakao.min.js"
           strategy="afterInteractive"
-          onLoad={() => setKakaoReady(true)}
+          onReady={() => setKakaoReady(true)}
         />
       )}
       <button
