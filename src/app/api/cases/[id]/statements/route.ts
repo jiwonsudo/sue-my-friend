@@ -34,10 +34,7 @@ export const POST = handle<Ctx>(async (req, { params }) => {
 
   const body = parse(bodySchema, await readJson(req));
   const sentences = body.sentences.map((s) => sanitize(s, LIMITS.sentence)).filter(Boolean);
-  const max = slot.kind === "testimony" ? 4 : 1;
-  if (sentences.length === 0 || sentences.length > max) {
-    fail(400, slot.kind === "testimony" ? "증언은 1~4문장이에요." : "한 문장만 쓸 수 있어요.");
-  }
+  if (sentences.length !== 1) fail(400, "한 문장만 쓸 수 있어요.");
 
   const row: Record<string, unknown> = {
     case_id: c.id,
@@ -50,7 +47,8 @@ export const POST = handle<Ctx>(async (req, { params }) => {
   if (slot.kind === "rebuttal") {
     const target = rebuttalTarget(statements, slot.round);
     if (target && !target.forfeited) {
-      const idx = body.targetSentenceIdx;
+      // 예전 사건은 증언이 여러 문장일 수 있다. 한 문장이면 고를 필요 없이 그 문장
+      const idx = body.targetSentenceIdx ?? (target.sentences.length === 1 ? 0 : null);
       if (idx == null || idx >= target.sentences.length) fail(400, "반박할 문장을 골라주세요.");
       row.target_statement_id = target.id;
       row.target_sentence_idx = idx;
@@ -67,14 +65,14 @@ export const POST = handle<Ctx>(async (req, { params }) => {
       if (!ev) fail(400, "증거를 찾을 수 없습니다.");
       row.evidence_id = ev.id;
     }
-    if (body.lawId) {
-      const used = await fetchLawyerUse(c.id, role, slot.round);
-      if (!used?.granted_at || !used.suggestions?.some((s) => s.lawId === body.lawId)) fail(400, "선임한 변호인이 추천한 조항만 인용할 수 있습니다.");
-      row.law_id = body.lawId;
-      row.lawyer_use_id = used.id;
-    }
-  } else if (body.cardId || body.evidenceId || body.lawId) {
-    fail(400, "항변 카드·증거·조항 인용은 반박에만 붙일 수 있어요.");
+  } else if (body.cardId || body.evidenceId) {
+    fail(400, "항변 카드·증거는 반박에만 붙일 수 있어요.");
+  }
+  if (body.lawId) {
+    const used = await fetchLawyerUse(c.id, role, slot.round);
+    if (!used?.granted_at || !used.suggestions?.some((s) => s.lawId === body.lawId)) fail(400, "선임한 변호인이 추천한 조항만 인용할 수 있습니다.");
+    row.law_id = body.lawId;
+    row.lawyer_use_id = used.id;
   }
 
   const { error } = await db().from("statements").insert(row);

@@ -84,7 +84,7 @@ export async function suggestObjections(c: CaseRow, target: StatementRow | null,
 경위(원고 주장): ${sanitize(c.situation, 500)}
 청구: ${sanitize(c.demand, 100)}
 상대 증언:
-${(target?.sentences ?? []).map((s, i) => `${i}. ${sanitize(s, 200)}`).join("\n")}
+${target?.sentences.length ? target.sentences.map((s, i) => `${i}. ${sanitize(s, 200)}`).join("\n") : "(없음: 의뢰인이 먼저 말하는 차례. 원고의 경위와 청구를 겨냥한다)"}
 </user_input>
 조항 목록 (id: 조항 — 요지):
 ${laws.map((l) => `${l.id}: ${lawLabel(l)} — ${l.gist}`).join("\n")}`;

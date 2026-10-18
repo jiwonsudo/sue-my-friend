@@ -87,8 +87,8 @@ export function TrialClient({
     if (!c) return "";
     const side = `${ROLE_LABEL[c.role]} 측 ${nick(c.role)}`;
     const forfeited = view.statements.at(-1)?.forfeited ? "직전 진술은 기한 경과로 포기 처리되었습니다. " : "";
-    if (c.kind === "testimony") return `${forfeited}${c.round}라운드를 시작합니다. ${side}, 증언하십시오.`;
-    if (c.kind === "rebuttal") return `${forfeited}${side}, 상대 증언 중 한 문장을 골라 반박하십시오.`;
+    if (c.kind === "testimony") return `${forfeited}공판을 시작합니다. ${side}, 한 문장으로 증언하십시오.`;
+    if (c.kind === "rebuttal") return `${forfeited}${side}, 한 문장으로 반박하십시오.`;
     return `${forfeited}최후진술입니다. ${side}, 한 문장으로 말씀하십시오.`;
   }, [view, nick]);
 
@@ -239,7 +239,7 @@ export function TrialClient({
           ) : null}
           {view.status === "trial" && (
             <p className="mt-2 border-t border-dashed border-white/15 pt-2 text-center font-type text-[11px] leading-relaxed text-white/50">
-              3라운드가 끝나면 AI 재판장이 양측 진술을 검토해 바로 판결함.
+              피고 한마디, 원고 한마디가 끝나면 AI 재판장이 바로 선고함.
             </p>
           )}
         </div>
@@ -345,8 +345,6 @@ function StatementCard({
   return (
     <div className={`grid grid-cols-[3.2rem_1fr] gap-x-3 border-b border-white/10 py-3 ${s.role === "defendant" ? "bg-seal/[0.07]" : ""}`}>
       <p className="pt-0.5 pl-1 font-type text-[11px] leading-tight text-white/45">
-        {s.round}R
-        <br />
         <span className={s.role === "plaintiff" ? "text-white/80" : "text-[#ff8f8f]"}>{ROLE_LABEL[s.role]}</span>
         <br />
         {KIND_LABEL[s.kind]}
@@ -362,7 +360,7 @@ function StatementCard({
           )}
           <ol className="space-y-1 text-[15px] leading-relaxed">
             {s.sentences.map((t, i) => (
-              <li key={i}>{s.kind === "testimony" ? `${i + 1}. ${t}` : t}</li>
+              <li key={i}>{s.sentences.length > 1 ? `${i + 1}. ${t}` : t}</li>
             ))}
           </ol>
           {s.law_id && LAW_BY_ID.get(s.law_id) && (
@@ -400,12 +398,11 @@ function Compose({ view, onDone }: { view: TrialView; onDone: () => void }) {
   const [error, setError] = useState<string | null>(null);
   const target = slot.kind === "rebuttal" ? rebuttalTarget(view.statements, slot.round) : null;
   const needsTarget = !!target && !target.forfeited;
-  const max = slot.kind === "testimony" ? 4 : 1;
   const filled = lines.map((l) => l.trim()).filter(Boolean);
   // 반박할 문장이 하나뿐이면 고를 필요 없이 그 문장
   const chosen = targetIdx ?? (target && target.sentences.length === 1 ? 0 : null);
   const missing =
-    needsTarget && chosen == null ? "위에서 반박할 문장을 먼저 고를 것" : filled.length === 0 ? `${slot.kind === "testimony" ? "증언" : "한 문장"}을 쓸 것` : null;
+    needsTarget && chosen == null ? "위에서 반박할 문장을 먼저 고를 것" : filled.length === 0 ? "한 문장을 쓸 것" : null;
 
   const submit = async () => {
     setBusy(true);
@@ -428,17 +425,23 @@ function Compose({ view, onDone }: { view: TrialView; onDone: () => void }) {
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <p className="font-serif text-[15px] font-bold">
-          내 차례 · {slot.round}라운드 {label}
+          내 차례 · {label}
         </p>
         <p className="font-type text-[12px] text-white/60">
           남은 시간 <Countdown deadline={slot.deadline} format="hm" />
         </p>
       </div>
 
-      {needsTarget && target && (
+      {needsTarget && target && target.sentences.length === 1 && (
+        <p className="border-l-2 border-seal pl-2 text-[14px] text-white/70">
+          <span className="mb-0.5 block font-type text-[11px] text-white/45">상대 증언</span>「{target.sentences[0]}」
+        </p>
+      )}
+      {/* 예전 사건: 증언이 여러 문장이면 하나를 골라 반박 */}
+      {needsTarget && target && target.sentences.length > 1 && (
         <div>
           <p className="mb-1.5 font-type text-[12px] text-white/60">
-            ① 반박할 문장 {target.sentences.length > 1 ? "하나를 눌러 고를 것" : "(자동 선택됨)"}
+            ① 반박할 문장 하나를 눌러 고를 것
           </p>
           <div role="radiogroup" aria-label="반박할 문장" className="space-y-1.5">
             {target.sentences.map((t, i) => (
@@ -466,7 +469,7 @@ function Compose({ view, onDone }: { view: TrialView; onDone: () => void }) {
         </div>
       )}
 
-      {slot.kind === "rebuttal" && view.lawyer && (
+      {view.lawyer && (
         <LawyerPanel
           caseId={view.caseId}
           initial={view.lawyer}
@@ -492,15 +495,10 @@ function Compose({ view, onDone }: { view: TrialView; onDone: () => void }) {
           value={l}
           maxLength={LIMITS.sentence}
           onChange={(e) => setLines(lines.map((x, j) => (j === i ? e.target.value : x)))}
-          placeholder={slot.kind === "testimony" ? `${i + 1}번째 문장` : slot.kind === "rebuttal" ? "반박 한 문장" : "최후진술 한 문장"}
+          placeholder={slot.kind === "rebuttal" ? "반박 한 문장" : "증언 한 문장"}
           className="min-h-12 w-full border-b border-white/30 bg-transparent px-1 text-[16px] outline-none placeholder:text-white/30 focus:border-white/80"
         />
       ))}
-      {lines.length < max && (
-        <button type="button" className="min-h-11 font-type text-[12px] text-white/60 underline" onClick={() => setLines([...lines, ""])}>
-          문장 추가 ({lines.length}/{max})
-        </button>
-      )}
 
       {error && <p className="text-sm text-red-300">{error}</p>}
       <button
@@ -517,7 +515,7 @@ function Compose({ view, onDone }: { view: TrialView; onDone: () => void }) {
 }
 
 /**
- * 광고 보상형 AI 변호인: 반박 차례마다 1번. 광고를 보면 법 조항을 인용한 이의 2~3개를 추천받고 하나를 골라 제출한다.
+ * 광고 보상형 AI 변호인: 내 차례마다 1번. 광고를 보면 법 조항을 인용한 이의 2~3개를 추천받고 하나를 골라 제출한다.
  * 고른 이의는 재판장이 가산점을 준다.
  */
 function LawyerPanel({
@@ -573,7 +571,7 @@ function LawyerPanel({
         <>
           <p className="font-serif text-[14px] font-bold text-[#f0d896]">변호인 선임</p>
           <p className="mt-1 font-type text-[11.5px] leading-relaxed text-white/60">
-            광고를 끝까지 보면 AI 변호인이 법 조항을 인용한 이의를 써 줌. 변호인을 쓴 진술은 재판장이 가산점을 줌. 이번 반박 차례에 1번.
+            광고를 끝까지 보면 AI 변호인이 법 조항을 인용한 이의를 써 줌. 변호인을 쓴 진술은 재판장이 가산점을 줌. 이번 차례에 1번.
           </p>
           <button
             type="button"

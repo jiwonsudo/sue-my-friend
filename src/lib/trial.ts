@@ -1,13 +1,12 @@
 import type { Role, StatementRow, TrialSlot } from "./types";
 
-/** 공방 순서: 6개 슬롯을 순서대로 하나씩 채운다. */
+/**
+ * 공방 순서: 한 번 주고받고 바로 판결한다.
+ * 원고 주장은 통고서에 이미 있으므로 피고가 먼저 한마디, 원고가 받아치면 AI 재판장이 선고.
+ */
 export const TRIAL_SLOTS: TrialSlot[] = [
-  { round: 1, role: "plaintiff", kind: "testimony" },
-  { round: 1, role: "defendant", kind: "rebuttal" },
-  { round: 2, role: "defendant", kind: "testimony" },
-  { round: 2, role: "plaintiff", kind: "rebuttal" },
-  { round: 3, role: "plaintiff", kind: "final" },
-  { round: 3, role: "defendant", kind: "final" },
+  { round: 1, role: "defendant", kind: "testimony" },
+  { round: 1, role: "plaintiff", kind: "rebuttal" },
 ];
 
 export function currentSlot(statements: Pick<StatementRow, "id">[]): TrialSlot | null {

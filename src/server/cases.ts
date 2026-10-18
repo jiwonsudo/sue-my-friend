@@ -115,7 +115,7 @@ async function advance(c: CaseRow, now = Date.now()): Promise<boolean> {
   return false;
 }
 
-/** 공방 6턴이 모두 끝났을 때: AI 재판장이 바로 판결 */
+/** 공방 차례가 모두 끝났을 때: AI 재판장이 바로 판결 */
 export async function finishTrial(c: CaseRow) {
   const fresh = (await fetchCase(c.id)) ?? c;
   if (fresh.status !== "trial") return;

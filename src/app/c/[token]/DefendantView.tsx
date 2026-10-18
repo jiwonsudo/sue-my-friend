@@ -209,8 +209,8 @@ function ReplySlip({
   const [pick, setPick] = useState<Action | "ignore" | null>(null);
   const options: { id: Action | "ignore"; label: string; note: string }[] = [
     { id: "accept", label: "청구를 인정하고 이행함", note: "즉시 판결 선고" },
-    { id: "object", label: "이의를 신청함", note: "3라운드 공방" },
-    { id: "countersue", label: "맞고소함", note: "3라운드 공방" },
+    { id: "object", label: "이의를 신청함", note: "한마디씩 공방" },
+    { id: "countersue", label: "맞고소함", note: "한마디씩 공방" },
     { id: "ignore", label: "답변하지 아니함", note: "기한 경과 시 궐석" },
   ];
   const submit = () => {

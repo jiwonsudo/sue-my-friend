@@ -20,7 +20,7 @@ const anthropic = () => (client ??= new Anthropic());
 
 function transcript(c: CaseRow, statements: StatementRow[]): string {
   const lines = statements.map((s) => {
-    const head = `[${s.round}라운드 ${ROLE_LABEL[s.role]} ${KIND_LABEL[s.kind]}]`;
+    const head = `[${ROLE_LABEL[s.role]} ${KIND_LABEL[s.kind]}]`;
     if (s.forfeited) return `${head} (기한 내 진술하지 않아 진술 포기)`;
     const target = s.target_statement_id ? statements.find((x) => x.id === s.target_statement_id) : null;
     const quoted = target && s.target_sentence_idx != null ? ` 반박 대상: 「${sanitize(target.sentences[s.target_sentence_idx] ?? "", 200)}」` : "";

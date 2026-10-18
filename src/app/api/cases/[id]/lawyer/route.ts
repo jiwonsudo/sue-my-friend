@@ -28,7 +28,7 @@ export const POST = handle<Ctx>(async (req, { params }) => {
   if (c.status !== "trial") fail(409, "공방 중에만 변호인을 선임할 수 있습니다.");
   const statements = await fetchStatements(c.id);
   const slot = currentSlot(statements);
-  if (!slot || slot.kind !== "rebuttal") fail(409, "변호인은 반박 차례에만 선임할 수 있습니다.");
+  if (!slot) fail(409, "공방이 끝났습니다.");
   const role = await requireRole(c.id, [slot.role]);
   const body = parse(bodySchema, await readJson(req));
   const used = await fetchLawyerUse(c.id, role, slot.round);

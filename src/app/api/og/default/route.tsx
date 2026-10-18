@@ -2,7 +2,7 @@ import { ImageResponse } from "next/og";
 import { Brand, FormLine, OG, ogFonts, sheetShadow, woodBg } from "@/server/og";
 
 export async function GET() {
-  const lines = ["1. 친구 간 사소한 원한(내기, 읽씹, 노쇼, 빌린 돈 등)에 한하여 접수함.", "2. 접수된 사건은 통고서로 작성하여 상대방에게 송달함.", "3. 상대방이 다투는 경우 3회 공방을 거쳐 판결함."];
+  const lines = ["1. 친구 간 사소한 원한(내기, 읽씹, 노쇼, 빌린 돈 등)에 한하여 접수함.", "2. 접수된 사건은 통고서로 작성하여 상대방에게 송달함.", "3. 상대방이 다투는 경우 한마디씩 공방 후 바로 판결함."];
   const note = "원한 크기 무관 상시 접수";
   return new ImageResponse(
     (

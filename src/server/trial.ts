@@ -26,7 +26,7 @@ export async function buildTrialView(c: CaseRow, me: Role | null): Promise<Trial
     })),
   );
   const slot = c.status === "trial" ? currentSlot(statements) : null;
-  const lawyerUse = slot && me && slot.kind === "rebuttal" && slot.role === me ? await fetchLawyerUse(c.id, me, slot.round) : null;
+  const lawyerUse = slot && me && slot.role === me ? await fetchLawyerUse(c.id, me, slot.round) : null;
   const last = statements.at(-1)?.created_at ?? c.trial_started_at ?? c.created_at;
   return {
     caseId: c.id,
@@ -39,7 +39,7 @@ export async function buildTrialView(c: CaseRow, me: Role | null): Promise<Trial
     statements,
     evidence,
     lawyer:
-      slot && me && slot.kind === "rebuttal" && slot.role === me
+      slot && me && slot.role === me
         ? { used: !!lawyerUse?.granted_at, suggestions: lawyerUse?.suggestions ?? null }
         : null,
     current: slot ? { ...slot, deadline: new Date(new Date(last).getTime() + TURN_WINDOW_MS).toISOString() } : null,

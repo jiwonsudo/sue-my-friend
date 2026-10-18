@@ -23,7 +23,7 @@ export function LandingIntake() {
             <ol className="mt-4 space-y-0.5 text-[12.5px] leading-relaxed text-black/70">
               <li>1. 친구 간 사소한 원한(내기·노쇼·지각, 빌린 돈·더치페이, 읽씹·단톡방 잠수, 게임 트롤·스포일러 등)에 한하여 접수함.</li>
               <li>2. 접수된 사건은 통고서로 작성하여 상대방에게 송달함.</li>
-              <li>3. 상대방이 다투는 경우 3회 공방을 거쳐 AI 재판장이 판결함.</li>
+              <li>3. 상대방이 다투는 경우 한마디씩 주고받은 뒤 AI 재판장이 바로 판결함.</li>
             </ol>
 
             <table className="mt-4 w-full border-collapse border-[1.5px] border-ink text-[13px]">
