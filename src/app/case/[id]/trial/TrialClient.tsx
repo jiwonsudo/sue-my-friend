@@ -15,19 +15,18 @@ import { api } from "@/lib/client/api";
 import { isMuted, setMuted } from "@/lib/client/sfx";
 import { CUTIN_LINES, DEFENSE_CARDS, LIMITS } from "@/lib/constants";
 import { LAW_BY_ID, lawLabel, type LawyerSuggestion } from "@/lib/laws";
-import { KIND_LABEL, otherRole, rebuttalTarget, ROLE_LABEL } from "@/lib/trial";
+import { KIND_LABEL, rebuttalTarget, ROLE_LABEL } from "@/lib/trial";
 import type { PublicEvidence, Role, StatementRow, TrialView } from "@/lib/types";
 
 const POLL_MS = 5000;
 
 export function TrialClient({
   initial,
-  canSwitch,
-  notifyLinks,
+  trialUrl,
 }: {
   initial: TrialView;
-  canSwitch: boolean;
-  notifyLinks: Record<Role, string>;
+  /** 상대에게 보낼 공방 주소. 열면 원고·피고 중 자리를 고른다 */
+  trialUrl: string;
 }) {
   const router = useRouter();
   const [view, setView] = useState(initial);
@@ -47,7 +46,7 @@ export function TrialClient({
     try {
       const v = await api<TrialView>(`/api/cases/${view.caseId}/trial?as=${me}`);
       setView(v);
-      if (v.status === "judged" || v.status === "executed") router.push(`/v/${v.caseId}`);
+      if (v.status === "judged" || v.status === "executed") router.push(`/v/${v.caseId}?as=${me}`);
     } catch {}
   }, [view.caseId, me, router]);
 
@@ -119,11 +118,9 @@ export function TrialClient({
 
         right={
           <div className="flex items-center gap-1">
-            {canSwitch && (
-              <Link href={`?as=${otherRole(me)}`} onClick={() => setTimeout(() => location.reload(), 50)} className="min-h-11 px-2 py-3 font-type text-[11px] text-white/50">
-                {ROLE_LABEL[otherRole(me)]} 시점
-              </Link>
-            )}
+            <Link href="?" onClick={() => setTimeout(() => location.reload(), 50)} className="min-h-11 px-2 py-3 font-type text-[11px] text-white/50">
+              자리 바꾸기
+            </Link>
             <button
               type="button"
               aria-label={muted ? "소리 켜기" : "소리 끄기"}
@@ -228,7 +225,7 @@ export function TrialClient({
                   </p>
                   <ShareButtons
                     compact
-                    url={notifyLinks[view.current.role]}
+                    url={trialUrl}
                     title={`[${view.caseNo}] ${nick(view.current.role)}님 ${KIND_LABEL[view.current.kind]} 차례입니다`}
                     text={`${view.title} — ${ROLE_LABEL[me]} ${nick(me)}의 진술이 제출됨. 기한 6시간.`}
                     buttonLabel="공방 입장"
@@ -408,7 +405,7 @@ function Compose({ view, onDone }: { view: TrialView; onDone: () => void }) {
     setBusy(true);
     setError(null);
     try {
-      await api(`/api/cases/${view.caseId}/statements`, {
+      await api(`/api/cases/${view.caseId}/statements?as=${slot.role}`, {
         json: { sentences: filled, targetSentenceIdx: chosen, lawId },
       });
       setLines([""]);
@@ -472,6 +469,7 @@ function Compose({ view, onDone }: { view: TrialView; onDone: () => void }) {
       {view.lawyer && (
         <LawyerPanel
           caseId={view.caseId}
+          as={slot.role}
           initial={view.lawyer}
           chosenLawId={lawId}
           onPick={(sg) => {
@@ -520,11 +518,13 @@ function Compose({ view, onDone }: { view: TrialView; onDone: () => void }) {
  */
 function LawyerPanel({
   caseId,
+  as,
   initial,
   chosenLawId,
   onPick,
 }: {
   caseId: string;
+  as: Role;
   initial: NonNullable<TrialView["lawyer"]>;
   chosenLawId: string | null;
   onPick: (s: LawyerSuggestion) => void;
@@ -540,7 +540,7 @@ function LawyerPanel({
   const start = async () => {
     setError(null);
     try {
-      const r = await api<{ ticket: string; minAdMs: number }>(`/api/cases/${caseId}/lawyer`, { json: { action: "ticket" } });
+      const r = await api<{ ticket: string; minAdMs: number }>(`/api/cases/${caseId}/lawyer?as=${as}`, { json: { action: "ticket" } });
       ticket.current = { value: r.ticket, at: Date.now(), minMs: r.minAdMs };
       setPhase("ad");
     } catch (e) {
@@ -556,7 +556,7 @@ function LawyerPanel({
     const wait = t.at + t.minMs + 300 - Date.now();
     if (wait > 0) await new Promise((r) => setTimeout(r, wait));
     try {
-      const r = await api<{ suggestions: LawyerSuggestion[] }>(`/api/cases/${caseId}/lawyer`, { json: { action: "grant", ticket: t.value } });
+      const r = await api<{ suggestions: LawyerSuggestion[] }>(`/api/cases/${caseId}/lawyer?as=${as}`, { json: { action: "grant", ticket: t.value } });
       setSuggestions(r.suggestions);
       setPhase("idle");
     } catch (e) {

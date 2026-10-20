@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { LIMITS } from "@/lib/constants";
-import type { Role } from "@/lib/types";
-import { requireRole } from "@/server/auth";
+import { trialRole } from "@/server/auth";
 import { requireCase } from "@/server/cases";
 import { assertSameOrigin, fail, handle, readJson } from "@/server/http";
 import { sanitize } from "@/server/llm";
@@ -14,7 +13,7 @@ export const PATCH = handle<Ctx>(async (req, { params }) => {
   assertSameOrigin(req);
   const { id, eid } = await params;
   const c = await requireCase(id);
-  const role = await requireRole(c.id, ["plaintiff", "defendant"], req.nextUrl.searchParams.get("as") as Role | null);
+  const role = trialRole(req.nextUrl.searchParams.get("as"));
   const { label } = await readJson<{ label?: unknown }>(req);
   const clean = typeof label === "string" ? sanitize(label, LIMITS.label) : "";
   if (!clean) fail(400, "이름을 입력해주세요.");

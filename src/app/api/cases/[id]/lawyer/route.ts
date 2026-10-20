@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { currentSlot, rebuttalTarget } from "@/lib/trial";
-import { requireRole } from "@/server/auth";
+import { trialRole } from "@/server/auth";
 import { fetchStatements, requireCase } from "@/server/cases";
 import { assertSameOrigin, fail, handle, readJson } from "@/server/http";
 import { fetchLawyerUse, MIN_AD_MS, suggestObjections } from "@/server/lawyer";
@@ -29,7 +29,8 @@ export const POST = handle<Ctx>(async (req, { params }) => {
   const statements = await fetchStatements(c.id);
   const slot = currentSlot(statements);
   if (!slot) fail(409, "공방이 끝났습니다.");
-  const role = await requireRole(c.id, [slot.role]);
+  const role = trialRole(req.nextUrl.searchParams.get("as"));
+  if (role !== slot.role) fail(403, "지금은 상대 차례입니다.");
   const body = parse(bodySchema, await readJson(req));
   const used = await fetchLawyerUse(c.id, role, slot.round);
 

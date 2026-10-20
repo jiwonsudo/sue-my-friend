@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import type { Role } from "@/lib/types";
-import { requireRole } from "@/server/auth";
+import { trialRole } from "@/server/auth";
 import { requireCase } from "@/server/cases";
 import { assertSameOrigin, fail, handle } from "@/server/http";
 import { db, signedUrl } from "@/server/supabase";
@@ -13,7 +12,7 @@ export const POST = handle<Ctx>(async (req, { params }) => {
   const { id } = await params;
   const c = await requireCase(id);
   if (c.status !== "trial") fail(409, "공방 중에만 증거를 낼 수 있어요.");
-  const role = await requireRole(c.id, ["plaintiff", "defendant"], req.nextUrl.searchParams.get("as") as Role | null);
+  const role = trialRole(req.nextUrl.searchParams.get("as"));
   const form = await req.formData().catch(() => fail(400, "요청 형식이 올바르지 않습니다."));
   const path = await uploadImage(form.get("file"), c.id);
   const { count } = await db().from("evidence").select("id", { count: "exact", head: true }).eq("case_id", c.id);

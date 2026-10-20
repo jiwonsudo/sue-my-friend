@@ -2,12 +2,13 @@ import type { Metadata } from "next";
 import { Gate } from "@/components/Gate";
 import { formatDateTime, formatDate, loserOf, VERDICT_LABEL } from "@/lib/document";
 import { otherRole } from "@/lib/trial";
+import type { Role } from "@/lib/types";
 import { rolesForCase } from "@/server/auth";
 import { fetchJudgment, loadCase, purgeAt } from "@/server/cases";
 import { JudgmentView } from "./JudgmentView";
 
 export const dynamic = "force-dynamic";
-type Props = { params: Promise<{ caseId: string }> };
+type Props = { params: Promise<{ caseId: string }>; searchParams: Promise<{ as?: string }> };
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { caseId } = await params;
@@ -24,14 +25,15 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   };
 }
 
-export default async function VerdictPage({ params }: Props) {
-  const { caseId } = await params;
+export default async function VerdictPage({ params, searchParams }: Props) {
+  const [{ caseId }, { as }] = await Promise.all([params, searchParams]);
   const c = await loadCase(caseId);
   if (!c) return <Gate title="사건을 찾을 수 없습니다" body="주소를 다시 확인할 것. 판결·기각된 사건은 1시간 뒤 기록이 폐기됨." />;
   const j = await fetchJudgment(c.id);
   if (!j) return <Gate title="아직 판결 전입니다" body="피고와 원고가 한마디씩 주고받으면 AI 재판장이 바로 선고함." />;
 
-  const roles = await rolesForCase(c.id);
+  // 공방에서 고른 자리(?as=)도 내 쪽으로 본다
+  const roles = [...(await rolesForCase(c.id)), ...(as === "plaintiff" || as === "defendant" ? [as] : [])] as Role[];
   const loser = loserOf(j.verdict);
   const me = roles.includes(loser) ? loser : roles.includes(otherRole(loser)) ? otherRole(loser) : null;
 

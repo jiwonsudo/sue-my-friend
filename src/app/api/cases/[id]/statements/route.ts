@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { CARD_IDS, LIMITS } from "@/lib/constants";
 import { currentSlot, rebuttalTarget, TRIAL_SLOTS } from "@/lib/trial";
-import { requireRole } from "@/server/auth";
+import { trialRole } from "@/server/auth";
 import { fetchStatements, finishTrial, requireCase } from "@/server/cases";
 import { assertSameOrigin, fail, handle, readJson } from "@/server/http";
 import { sanitize } from "@/server/llm";
@@ -29,8 +29,9 @@ export const POST = handle<Ctx>(async (req, { params }) => {
   const statements = await fetchStatements(c.id);
   const slot = currentSlot(statements);
   if (!slot) fail(409, "공방이 끝났습니다.");
-  // 내 차례인 역할로만 진술할 수 있다
-  const role = await requireRole(c.id, [slot.role]);
+  // 지금 차례인 쪽으로 입장한 화면에서만 진술할 수 있다
+  const role = trialRole(req.nextUrl.searchParams.get("as"));
+  if (role !== slot.role) fail(403, "지금은 상대 차례입니다.");
 
   const body = parse(bodySchema, await readJson(req));
   const sentences = body.sentences.map((s) => sanitize(s, LIMITS.sentence)).filter(Boolean);

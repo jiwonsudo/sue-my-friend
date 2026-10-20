@@ -2,7 +2,7 @@ import "server-only";
 import { CLOSED_RETENTION_MS, RESPONSE_WINDOW_MS, TURN_WINDOW_MS } from "@/lib/constants";
 import { orderText } from "@/lib/document";
 import { mostRebutted, TRIAL_SLOTS } from "@/lib/trial";
-import type { CaseRow, JudgmentRow, Role, StatementRow, Verdict } from "@/lib/types";
+import type { CaseRow, JudgmentRow, StatementRow, Verdict } from "@/lib/types";
 import { db } from "./supabase";
 import { fail } from "./http";
 import { aiRuling } from "./judge";
@@ -182,22 +182,9 @@ export async function sendCase(c: CaseRow) {
   if (!data?.length) fail(409, "이미 발송된 사건입니다.");
 }
 
-/**
- * 공방 차례 알림 링크: 받는 사람의 토큰을 담아 어느 기기·브라우저(카톡 인앱 포함)에서 열어도 바로 입장한다.
- * 원고 토큰이 랜덤이던 예전 사건은 원고 링크를 만들 수 없어 공방 주소만 준다.
- */
-export async function notifyLinks(c: CaseRow, origin: string): Promise<Record<Role, string>> {
-  const plaintiff = deriveToken(c.id, "plaintiff", c.token_salt);
-  const { data } = await db()
-    .from("party_tokens")
-    .select("token_hash")
-    .eq("case_id", c.id)
-    .eq("role", "plaintiff")
-    .maybeSingle();
-  return {
-    defendant: `${origin}/t/${deriveToken(c.id, "defendant", c.token_salt)}`,
-    plaintiff: data?.token_hash === hashToken(plaintiff) ? `${origin}/t/${plaintiff}` : `${origin}/case/${c.id}/trial?as=plaintiff`,
-  };
+/** 공방 차례 알림 링크: 받은 사람이 열어서 원고·피고 중 자기 자리를 골라 들어온다 */
+export function trialLink(c: CaseRow, origin: string): string {
+  return `${origin}/case/${c.id}/trial`;
 }
 
 export function partyLinks(c: CaseRow, origin: string) {

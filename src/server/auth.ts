@@ -48,6 +48,15 @@ export async function rolesForCase(caseId: string): Promise<Role[]> {
   return roles;
 }
 
+/**
+ * 공방(진술·변호인·증거·공방 조회)은 쿠키로 주인을 가리지 않는다. 링크를 받은 사람이 원고·피고 중 골라 들어오고,
+ * 요청마다 ?as= 로 어느 쪽으로 말하는지 밝힌다. (친구끼리 하는 장난이라 상대 행세는 막지 않기로 함)
+ */
+export function trialRole(as: string | null | undefined): Role {
+  if (as !== "plaintiff" && as !== "defendant") fail(400, "원고·피고 중 어느 쪽으로 입장했는지 알 수 없습니다.");
+  return as;
+}
+
 /** 허용된 역할 중 하나로 인증. prefer 가 있으면 우선. */
 export async function requireRole(caseId: string, allowed: Role[], prefer?: Role | null): Promise<Role> {
   const mine = (await rolesForCase(caseId)).filter((r) => allowed.includes(r));
